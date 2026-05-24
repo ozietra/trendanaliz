@@ -6,6 +6,7 @@ import {
   paytrWebhook,
   getPaymentStatus,
   mockSuccess,
+  notifyIbanPayment,
 } from '../controllers/payment.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 
@@ -13,6 +14,7 @@ const router = Router();
 
 // Korumalı: yeni ödeme oluştur
 router.post('/checkout', authenticateToken as any, createCheckout as any);
+router.post('/iban-notify', authenticateToken as any, notifyIbanPayment as any);
 router.get('/:id', authenticateToken as any, getPaymentStatus as any);
 router.post('/:id/mock-success', authenticateToken as any, mockSuccess as any);
 

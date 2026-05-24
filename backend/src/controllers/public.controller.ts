@@ -83,13 +83,12 @@ const DEFAULT_PLANS = [
  */
 export const getPlans = async (_req: Request, res: Response) => {
   try {
+    // Tüm planları döndür (aktif/pasif). Frontend satışa kapalı olanları rozet ile gösterir.
     const plans = await prisma.plan.findMany({
-      where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
 
     if (plans.length === 0) {
-      // Veritabanı henüz seed edilmemişse fallback planlarını dön
       return res.json({
         success: true,
         data: DEFAULT_PLANS,
@@ -103,7 +102,6 @@ export const getPlans = async (_req: Request, res: Response) => {
   } catch (error: unknown) {
     const err = error as Error;
     logger.error(`Planları getirme hatası: ${err.message}`);
-    // Veritabanı hatası durumunda bile frontend çökmesin diye fallback planlarını dönüyoruz
     return res.json({
       success: true,
       data: DEFAULT_PLANS,
@@ -135,6 +133,55 @@ export const getSiteSettings = async (_req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: 'Site ayarları yüklenemedi.',
+    });
+  }
+};
+
+/**
+ * GET /api/public/payment-methods
+ * Aktif ödeme yöntemlerini ve IBAN bilgilerini döndürür
+ */
+export const getPaymentMethods = async (_req: Request, res: Response) => {
+  try {
+    const settings = await prisma.siteSettings.findMany({
+      where: {
+        key: {
+          in: [
+            'payment.iyzico.enabled',
+            'payment.paytr.enabled',
+            'payment.iban.enabled',
+            'site.iban',
+            'site.ibanReceiver',
+          ],
+        },
+      },
+    });
+
+    const settingsMap = settings.reduce((acc, s) => {
+      acc[s.key] = s.value;
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Varsayılan: Iyzico ve PayTR açık, IBAN kapalı
+    const methods: string[] = [];
+    if (settingsMap['payment.iyzico.enabled'] !== false) methods.push('IYZICO');
+    if (settingsMap['payment.paytr.enabled'] !== false) methods.push('PAYTR');
+    if (settingsMap['payment.iban.enabled'] === true) methods.push('IBAN');
+
+    return res.json({
+      success: true,
+      data: {
+        methods,
+        iban: settingsMap['site.iban'] || null,
+        ibanReceiver: settingsMap['site.ibanReceiver'] || null,
+      },
+    });
+  } catch (error: unknown) {
+    const err = error as Error;
+    logger.error(`Payment methods hatası: ${err.message}`);
+    return res.json({
+      success: true,
+      data: { methods: ['IYZICO', 'PAYTR'], iban: null, ibanReceiver: null },
     });
   }
 };

@@ -174,6 +174,20 @@ export default function AdminPlansPage() {
                     Düzenle
                   </button>
                   <button
+                    onClick={async () => {
+                      try {
+                        await api.put(`/admin/plans/${p.id}`, { isActive: !p.isActive });
+                        await load();
+                      } catch (err: any) {
+                        setError(err.response?.data?.message || 'Güncellenemedi.');
+                      }
+                    }}
+                    className={`px-3 py-2 rounded-lg font-bold text-xs border ${p.isActive ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20' : 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'}`}
+                    title={p.isActive ? 'Satışa Kapat' : 'Satışa Aç'}
+                  >
+                    {p.isActive ? '✓ Satışta' : '✕ Kapalı'}
+                  </button>
+                  <button
                     onClick={() => remove(p)}
                     className="px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs"
                   >

@@ -567,14 +567,20 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
               {plans.map((plan) => {
                 const isPro = plan.isPopular || plan.slug === 'pro';
+                const isClosed = plan.isActive === false;
                 return (
                   <div 
                     key={plan.id}
-                    className={`relative rounded-2xl border transition-all duration-300 flex flex-col justify-between bg-slate-900/60 ${isPro ? 'border-brand-orange shadow-2xl shadow-brand-orange/10 -translate-y-2' : 'border-white/[0.05] hover:border-white/10'}`}
+                    className={`relative rounded-2xl border transition-all duration-300 flex flex-col justify-between bg-slate-900/60 ${isClosed ? 'opacity-60 border-white/[0.03]' : isPro ? 'border-brand-orange shadow-2xl shadow-brand-orange/10 -translate-y-2' : 'border-white/[0.05] hover:border-white/10'}`}
                   >
-                    {isPro && (
+                    {isPro && !isClosed && (
                       <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-brand-orange text-white text-[10px] font-extrabold tracking-widest px-4 py-1.5 rounded-full uppercase">
                         En Popüler Paket
+                      </div>
+                    )}
+                    {isClosed && (
+                      <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-red-500/80 text-white text-[10px] font-extrabold tracking-widest px-4 py-1.5 rounded-full uppercase">
+                        Satışa Kapalı
                       </div>
                     )}
 
@@ -617,12 +623,18 @@ export default function LandingPage() {
                     </div>
 
                     <div className="p-8 border-t border-white/[0.05]">
-                      <Link 
-                        href={`/kayit?plan=${plan.slug}`}
-                        className={`w-full text-center block font-bold text-sm py-3.5 rounded-xl transition-all ${isPro ? 'bg-brand-orange hover:bg-brand-orange-hover text-white shadow-lg shadow-brand-orange/10 hover:shadow-brand-orange/20 transform hover:-translate-y-0.5' : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'}`}
-                      >
-                        Planı Seç
-                      </Link>
+                      {isClosed ? (
+                        <span className="w-full text-center block font-bold text-sm py-3.5 rounded-xl bg-white/5 text-slate-500 border border-white/[0.06] cursor-not-allowed">
+                          Satışa Kapalı
+                        </span>
+                      ) : (
+                        <Link 
+                          href={`/kayit?plan=${plan.slug}`}
+                          className={`w-full text-center block font-bold text-sm py-3.5 rounded-xl transition-all ${isPro ? 'bg-brand-orange hover:bg-brand-orange-hover text-white shadow-lg shadow-brand-orange/10 hover:shadow-brand-orange/20 transform hover:-translate-y-0.5' : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'}`}
+                        >
+                          Planı Seç
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );

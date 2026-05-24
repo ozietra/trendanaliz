@@ -350,3 +350,86 @@ export const mockSuccess = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+/**
+ * POST /api/payments/iban-notify
+ * Body: { planId: string, senderName?: string, note?: string }
+ * Kullanıcı IBAN ile ödeme yaptığını bildirir. Pending subscription oluşturulur.
+ */
+export const notifyIbanPayment = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'Yetkisiz işlem.' });
+  }
+
+  const { planId, senderName, note } = req.body as {
+    planId: string;
+    senderName?: string;
+    note?: string;
+  };
+
+  if (!planId) {
+    return res.status(400).json({ success: false, message: 'planId gereklidir.' });
+  }
+
+  try {
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan || !plan.isActive) {
+      return res.status(404).json({ success: false, message: 'Plan bulunamadı veya aktif değil.' });
+    }
+
+    // PENDING subscription oluştur
+    const now = new Date();
+    const endDate = new Date(now);
+    if (plan.billingCycle === 'YEARLY') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
+
+    const subscription = await prisma.subscription.create({
+      data: {
+        userId,
+        planId: plan.id,
+        status: SubscriptionStatus.PENDING,
+        startDate: now,
+        endDate,
+        autoRenew: false,
+        paymentMethod: PaymentMethod.IBAN,
+      },
+    });
+
+    // PENDING payment kaydı oluştur
+    await prisma.payment.create({
+      data: {
+        userId,
+        subscriptionId: subscription.id,
+        amount: plan.price,
+        currency: plan.currency,
+        provider: PaymentProvider.IBAN,
+        method: PaymentMethod.IBAN,
+        status: PaymentStatus.PENDING,
+        ibanSenderName: senderName || null,
+        ibanNote: note || null,
+      },
+    });
+
+    // Admin'e bildirim
+    await createNotification({
+      userId,
+      title: 'IBAN ödeme bildirimi gönderildi',
+      message: `${plan.name} planı için havale/EFT bildirimi oluşturuldu. 1-3 saat içinde onaylanacaktır.`,
+      event: 'PAYMENT_PENDING',
+      type: 'INFO',
+    });
+
+    return res.json({
+      success: true,
+      message: 'Ödeme bildiriminiz alındı. 1-3 saat içinde kontrol edilip onaylanacaktır.',
+    });
+  } catch (err: unknown) {
+    const error = err as Error;
+    logger.error(`IBAN notify hatası: ${error.message}`);
+    return res.status(500).json({ success: false, message: 'Ödeme bildirimi oluşturulamadı.' });
+  }
+};

@@ -226,6 +226,7 @@ interface PlanLite {
   price: string;
   billingCycle: string;
   isPopular: boolean;
+  isActive: boolean;
   features: string[];
 }
 
@@ -263,18 +264,25 @@ function PlanPicker() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {plans.map((p) => (
+        {plans.map((p) => {
+          const isClosed = p.isActive === false;
+          return (
           <div
             key={p.id}
-            className={`bg-[#0b1424] border rounded-2xl p-5 flex flex-col ${
-              p.isPopular ? 'border-brand-orange/40' : 'border-white/[0.04]'
-            }`}
+            className={`bg-[#0b1424] border rounded-2xl p-5 flex flex-col ${isClosed ? 'opacity-60 border-white/[0.03]' : p.isPopular ? 'border-brand-orange/40' : 'border-white/[0.04]'}`}
           >
-            {p.isPopular && (
-              <span className="self-start text-[9px] font-bold uppercase bg-brand-orange/20 text-brand-orange px-2 py-0.5 rounded mb-2">
-                En Popüler
-              </span>
-            )}
+            <div className="flex items-center gap-2 mb-2">
+              {p.isPopular && !isClosed && (
+                <span className="text-[9px] font-bold uppercase bg-brand-orange/20 text-brand-orange px-2 py-0.5 rounded">
+                  En Popüler
+                </span>
+              )}
+              {isClosed && (
+                <span className="text-[9px] font-bold uppercase bg-red-500/10 text-red-400 px-2 py-0.5 rounded">
+                  Satışa Kapalı
+                </span>
+              )}
+            </div>
             <h3 className="text-lg font-black text-white">{p.name}</h3>
             <p className="text-[11px] text-slate-400 leading-relaxed mt-1 mb-3">
               {p.description}
@@ -295,19 +303,22 @@ function PlanPicker() {
                 </li>
               ))}
             </ul>
-            <Link
-              href={`/odeme/${p.slug}`}
-              className={`w-full inline-flex items-center justify-center gap-1 py-2.5 rounded-lg font-bold text-xs ${
-                p.isPopular
-                  ? 'bg-brand-orange hover:bg-brand-orange-hover text-white'
-                  : 'bg-white/5 hover:bg-white/10 text-white'
-              }`}
-            >
-              Seç
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+            {isClosed ? (
+              <span className="w-full inline-flex items-center justify-center py-2.5 rounded-lg font-bold text-xs bg-white/5 text-slate-500 cursor-not-allowed">
+                Satışa Kapalı
+              </span>
+            ) : (
+              <Link
+                href={`/odeme/${p.slug}`}
+                className={`w-full inline-flex items-center justify-center gap-1 py-2.5 rounded-lg font-bold text-xs ${p.isPopular ? 'bg-brand-orange hover:bg-brand-orange-hover text-white' : 'bg-white/5 hover:bg-white/10 text-white'}`}
+              >
+                Seç
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -13,12 +13,15 @@ interface Setting {
 }
 
 // Site ayarları için önerilen anahtarlar (boş değer = yeni eklenecek)
-const SUGGESTED_KEYS: Array<{ key: string; label: string; placeholder: string }> = [
+const SUGGESTED_KEYS: Array<{ key: string; label: string; placeholder: string; isToggle?: boolean }> = [
   { key: 'site.name', label: 'Site Adı', placeholder: 'TrendAnaliz' },
   { key: 'site.supportEmail', label: 'Destek E-postası', placeholder: 'destek@trendanaliz.com' },
   { key: 'site.iban', label: 'Manuel Ödeme IBAN', placeholder: 'TR00 0000 0000 0000 0000 0000 00' },
   { key: 'site.ibanReceiver', label: 'IBAN Alıcı', placeholder: 'TrendAnaliz Yazılım A.Ş.' },
   { key: 'site.maintenanceMode', label: 'Bakım Modu (true/false)', placeholder: 'false' },
+  { key: 'payment.iyzico.enabled', label: 'Iyzico (Kredi Kartı)', placeholder: 'true', isToggle: true },
+  { key: 'payment.paytr.enabled', label: 'PayTR (Kredi Kartı)', placeholder: 'true', isToggle: true },
+  { key: 'payment.iban.enabled', label: 'Havale / EFT (IBAN)', placeholder: 'false', isToggle: true },
 ];
 
 export default function AdminSettingsPage() {
@@ -128,7 +131,47 @@ export default function AdminSettingsPage() {
           </div>
         ) : (
           <div className="space-y-3 max-w-3xl">
-            {allKeys.map((key) => {
+            {/* Ödeme Yöntemleri Toggle Grubu */}
+            <div className="bg-[#0b1424] border border-brand-orange/20 rounded-xl p-5 mb-2">
+              <div className="text-xs font-bold text-brand-orange uppercase tracking-wider mb-4 flex items-center gap-2">
+                💳 Ödeme Yöntemleri
+              </div>
+              <div className="space-y-3">
+                {SUGGESTED_KEYS.filter(s => s.isToggle).map((suggested) => {
+                  const existing = items.find((s) => s.key === suggested.key);
+                  const currentVal = existing ? existing.value : (suggested.placeholder === 'true');
+                  const isEnabled = currentVal === true || currentVal === 'true';
+                  return (
+                    <div key={suggested.key} className="flex items-center justify-between py-2">
+                      <div>
+                        <div className="text-sm font-bold text-white">{suggested.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{suggested.key}</div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setBusy(suggested.key);
+                          try {
+                            await api.put(`/admin/settings/${encodeURIComponent(suggested.key)}`, { value: !isEnabled });
+                            await load();
+                          } catch (err: any) {
+                            setError(err.response?.data?.message || 'Kaydedilemedi.');
+                          } finally {
+                            setBusy(null);
+                          }
+                        }}
+                        disabled={busy === suggested.key}
+                        className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${isEnabled ? 'bg-brand-orange' : 'bg-white/10'} ${busy === suggested.key ? 'opacity-50' : ''}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${isEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Diğer Ayarlar */}
+            {allKeys.filter(key => !SUGGESTED_KEYS.find(s => s.key === key && s.isToggle)).map((key) => {
               const suggested = SUGGESTED_KEYS.find((s) => s.key === key);
               const existing = items.find((s) => s.key === key);
               const isDirty = dirty[key] !== undefined;
