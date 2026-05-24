@@ -1,0 +1,25 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="orangeGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FF8C00" />
+      <stop offset="100%" stop-color="#FF5500" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0E1A30" />
+      <stop offset="100%" stop-color="#070C16" />
+    </linearGradient>
+    <filter id="glow" x="-2" y="-2" width="36" height="36" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Sleek rounded square background -->
+  <rect width="32" height="32" rx="8" fill="url(#bgGrad)" stroke="#FF6B00" stroke-opacity="0.15" stroke-width="1"/>
+
+  <!-- Accent trend line with glow -->
+  <path d="M7 23C9.5 23 11 16 13.5 16C16 16 16.5 21 19 21C21.5 21 23 10 25.5 10" stroke="url(#orangeGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  
+  <!-- Arrow tip -->
+  <path d="M22 10H25.5V13.5" stroke="url(#orangeGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,107 @@
+version: '3.8'
+
+# TrendAnaliz - Full Stack Deployment
+#
+# Kullanım:
+#   cp .env.example .env  (kök dizine veya backend/ altına)
+#   docker compose up -d --build
+#
+# Hizmetler:
+#   - postgres : PostgreSQL 16
+#   - redis    : Redis 7 (BullMQ kuyruğu)
+#   - backend  : Express API + SSE
+#   - frontend : Next.js 14 (standalone)
+#   - nginx    : Reverse proxy + rate limit + SSE-aware
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trendanaliz-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-trendanaliz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trendanaliz_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-trendanaliz_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trendanaliz} -d ${POSTGRES_DB:-trendanaliz_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: trendanaliz-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trendanaliz-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-trendanaliz}:${POSTGRES_PASSWORD:-trendanaliz_secret}@postgres:5432/${POSTGRES_DB:-trendanaliz_db}?schema=public
+      REDIS_URL: redis://redis:6379
+      SEED_ON_START: ${SEED_ON_START:-0}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: trendanaliz-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      # Tarayıcı tarafından çağrıldığı için aynı origin üzerinden nginx'e gider
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    container_name: trendanaliz-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  pgdata:
+  redisdata:
