@@ -40,6 +40,9 @@ import orderRoutes from './routes/order.routes';
 import buyboxRoutes from './routes/buybox.routes';
 import webhookRoutes from './routes/webhook.routes';
 import healthRoutes from './routes/health.routes';
+import productGroupRoutes from './routes/product-group.routes';
+import bulkPricingRoutes from './routes/bulk-pricing.routes';
+import commissionRoutes from './routes/commission.routes';
 import { logger } from './utils/logger';
 import { SchedulerService } from './services/scheduler.service';
 import { startSubscriptionCron } from './services/subscription-cron.service';
@@ -130,6 +133,9 @@ app.use('/api/forecast', protectedGuard, forecastRoutes);
 app.use('/api/campaigns', protectedGuard, campaignRoutes);
 app.use('/api/orders', protectedGuard, orderRoutes);
 app.use('/api/buybox', protectedGuard, buyboxRoutes);
+app.use('/api/product-groups', protectedGuard, productGroupRoutes);
+app.use('/api/bulk-pricing', protectedGuard, bulkPricingRoutes);
+app.use('/api/commissions', protectedGuard, commissionRoutes);
 
 // Sağlık Kontrolleri: /health, /health/db, /health/redis, /health/full
 app.use('/health', healthRoutes);

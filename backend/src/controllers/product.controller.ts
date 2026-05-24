@@ -65,8 +65,10 @@ export const getProducts = async (req: AuthenticatedRequest, res: Response) => {
         name: product.title,
         sku: product.barcode,
         price: Number(product.salePrice),
+        listPrice: Number(product.listPrice),
         competitorPrice: competitorPrice,
         buybox: isOurPriceLowest,
+        categoryName: product.categoryName || null,
         minPrice: activeRule ? Number(activeRule.minPrice) : Number(product.salePrice) * 0.9,
         maxPrice: activeRule ? Number(activeRule.maxPrice) : Number(product.salePrice) * 1.5,
         rule: activeRule && activeRule.isActive ? activeRule.ruleType : 'none',
@@ -235,5 +237,36 @@ export const updateProductRule = async (req: AuthenticatedRequest, res: Response
     const err = error as Error;
     logger.error(`Update product rule hatası: ${err.message}`);
     return res.status(500).json({ success: false, message: 'Kural limitleri güncellenirken sunucu hatası oluştu.' });
+  }
+};
+
+/**
+ * GET /api/products/categories
+ * Mevcut ürünlerin benzersiz kategori listesini döndürür
+ */
+export const getCategories = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ success: false, message: 'Yetkisiz.' });
+
+  try {
+    const store = await prisma.trendyolStore.findFirst({ where: { userId } });
+    if (!store) return res.json({ success: true, data: [] });
+
+    const products = await prisma.product.findMany({
+      where: { storeId: store.id, categoryName: { not: null } },
+      select: { categoryName: true },
+      distinct: ['categoryName'],
+      orderBy: { categoryName: 'asc' },
+    });
+
+    const categories = products
+      .map((p) => p.categoryName)
+      .filter(Boolean) as string[];
+
+    return res.json({ success: true, data: categories });
+  } catch (error: unknown) {
+    const err = error as Error;
+    logger.error(`Get categories hatası: ${err.message}`);
+    return res.status(500).json({ success: false, message: 'Kategori listesi yüklenemedi.' });
   }
 };

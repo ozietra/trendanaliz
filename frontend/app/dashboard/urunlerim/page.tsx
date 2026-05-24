@@ -10,8 +10,10 @@ interface Product {
   name: string;
   sku: string;
   price: number;
+  listPrice: number;
   competitorPrice: number;
   buybox: boolean;
+  categoryName: string | null;
   minPrice: number;
   maxPrice: number;
   rule: string;
@@ -134,6 +136,7 @@ export default function UrunlerimPage() {
                 <thead>
                   <tr className="border-b border-white/[0.04] text-slate-500">
                     <th className="text-left p-3 font-semibold">Ürün</th>
+                    <th className="text-left p-3 font-semibold hidden lg:table-cell">Kategori</th>
                     <th className="text-left p-3 font-semibold hidden md:table-cell">Barkod</th>
                     <th className="text-right p-3 font-semibold">Fiyatım</th>
                     <th className="text-right p-3 font-semibold hidden md:table-cell">Rakip</th>
@@ -145,6 +148,7 @@ export default function UrunlerimPage() {
                   {products.map((p) => (
                     <tr key={p.id} className="border-b border-white/[0.02] hover:bg-white/[0.01]">
                       <td className="p-3 text-white max-w-xs truncate">{p.name}</td>
+                      <td className="p-3 text-slate-400 text-[10px] hidden lg:table-cell max-w-[120px] truncate" title={p.categoryName || '—'}>{p.categoryName || '—'}</td>
                       <td className="p-3 text-slate-400 font-mono hidden md:table-cell">{p.sku}</td>
                       <td className="p-3 text-right text-white font-bold">
                         ₺{p.price.toFixed(2)}

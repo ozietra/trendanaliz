@@ -161,10 +161,12 @@ model TrendyolStore {
   updatedAt    DateTime  @updatedAt
 
   // Relations
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  products     Product[]
-  campaigns    Campaign[]
-  orders       Order[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products         Product[]
+  campaigns        Campaign[]
+  orders           Order[]
+  productGroups    ProductGroup[]
+  commissionRates  CommissionRate[]
 
   @@index([userId])
   @@index([supplierId])
@@ -268,6 +270,7 @@ model Product {
   vatRate        Decimal          @db.Decimal(5, 2)
   stockCount     Int              @default(0)
   categoryId     String?
+  categoryName   String?
   brandId        String?
   imageUrl       String?
   listingScore   Float            @default(0.0)
@@ -284,9 +287,50 @@ model Product {
   listingAudits  ListingAudit[]
   salesForecasts SalesForecast[]
   orderItems     OrderItem[]
+  productGroups  ProductGroupItem[]
 
   @@index([storeId])
   @@index([barcode])
+  @@index([categoryName])
+}
+
+model ProductGroup {
+  id        String             @id @default(uuid())
+  storeId   String
+  name      String
+  color     String             @default("#f97316")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  store     TrendyolStore      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items     ProductGroupItem[]
+
+  @@unique([storeId, name])
+  @@index([storeId])
+}
+
+model ProductGroupItem {
+  id        String       @id @default(uuid())
+  groupId   String
+  productId String
+
+  group     ProductGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, productId])
+}
+
+model CommissionRate {
+  id           String        @id @default(uuid())
+  storeId      String
+  categoryName String
+  rate         Decimal       @db.Decimal(5, 2)
+  updatedAt    DateTime      @updatedAt
+
+  store        TrendyolStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, categoryName])
+  @@index([storeId])
 }
 
 model Competitor {

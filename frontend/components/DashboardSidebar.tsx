@@ -17,6 +17,9 @@ import {
   CreditCard,
   ShieldCheck,
   ShoppingBag,
+  FolderOpen,
+  DollarSign,
+  Percent,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth.store';
 
@@ -24,9 +27,12 @@ const NAV = [
   { href: '/dashboard', label: 'Genel Durum', icon: BarChart3 },
   { href: '/dashboard/magaza/ekle', label: 'Mağaza Ekle', icon: Store },
   { href: '/dashboard/urunlerim', label: 'Ürünlerim', icon: Package },
+  { href: '/dashboard/urun-gruplari', label: 'Ürün Grupları', icon: FolderOpen },
   { href: '/dashboard/siparisler', label: 'Siparişler', icon: ShoppingBag },
   { href: '/dashboard/buybox', label: 'BuyBox Durumu', icon: Search },
   { href: '/dashboard/fiyat-kurallari', label: 'Fiyat Kuralları', icon: Sliders },
+  { href: '/dashboard/toplu-fiyat', label: 'Toplu Fiyatlandırma', icon: DollarSign },
+  { href: '/dashboard/komisyon', label: 'Komisyonlar', icon: Percent },
   { href: '/dashboard/listing-skoru', label: 'Listing Skoru', icon: Star },
   { href: '/dashboard/tahmin', label: 'Satış Tahmini', icon: TrendingUp },
   { href: '/dashboard/kampanya-roi', label: 'Kampanya ROI', icon: Megaphone },
