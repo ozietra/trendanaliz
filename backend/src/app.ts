@@ -163,9 +163,14 @@ process.on('uncaughtException', (err) => {
   captureException(err);
 });
 
+import { autoSeedPlans } from './utils/auto-seed';
+
 // Sunucuyu Başlatma
 app.listen(PORT, async () => {
   logger.info(`TrendAnaliz Backend Sunucusu ${PORT} portunda çalışmaya başladı.`);
+  
+  // Veritabanında plan yoksa otomatik oluştur
+  await autoSeedPlans();
   
   // Arka plan zamanlayıcılarını başlat
   await SchedulerService.init();
