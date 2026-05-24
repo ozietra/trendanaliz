@@ -131,8 +131,8 @@ npx prisma db seed   # opsiyonel: planları + superadmin tohumla
    # Trendyol webhook (opsiyonel)
    TRENDYOL_WEBHOOK_SECRET=
 
-   # Trendyol live push (mağaza yoksa 0 bırak)
-   TRENDYOL_LIVE_PUSH=0
+   # Trendyol fiyat push (1=canlı, gerçek fiyat gönderir / 0=sadece DB'ye yazar, test modu)
+   TRENDYOL_LIVE_PUSH=1
    ```
 
 5. **Rastgele secret üret** (PowerShell):
@@ -144,6 +144,22 @@ npx prisma db seed   # opsiyonel: planları + superadmin tohumla
 6. **Create Web Service** → Deploy başlar (~3-5 dk). Logs sekmesinden takip et.
 7. Render sana `https://trendanaliz-api.onrender.com` benzeri bir URL verir.
 8. Bittiğinde: `https://<render-url>/health/full` → `{"status":"ok"}` görmeli.
+
+---
+
+## 3.5 UptimeRobot ile Uyku Modunu Engelle (2 dk, ücretsiz)
+
+Render free tier 15 dk boşta kalınca uyuya geçer. **UptimeRobot** her 5 dakikada
+ping atarak bunu engeller:
+
+1. <https://uptimerobot.com> → ücretsiz hesap oluştur
+2. **Add New Monitor**:
+   - Type: HTTP(s)
+   - URL: `https://<render-url>.onrender.com/health`
+   - Interval: 5 minutes
+3. **Create Monitor** → Backend artık 7/24 ayakta kalır.
+
+> Bonus: Backend çökerse UptimeRobot seni e-posta ile bilgilendirir (ücretsiz Sentry alternatifi).
 
 ---
 
