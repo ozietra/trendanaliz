@@ -11,8 +11,8 @@
    └────────────┬────────────┘
                 │ HTTPS (NEXT_PUBLIC_API_URL)
    ┌────────────▼────────────┐
-   │ trendanaliz-api.up.     │ ← Backend (Express, Railway free)
-   │ railway.app             │
+   │ trendanaliz-api.       │ ← Backend (Express, Render free)
+   │ onrender.com           │
    └────┬─────────────┬──────┘
         │             │
     ┌───▼────┐    ┌───▼─────────┐
@@ -25,7 +25,7 @@
 | Servis | Sağlayıcı | Free tier | Bu projeye yetiyor mu? |
 |---|---|---|---|
 | Frontend | **Vercel** | 100 GB bandwidth/ay | Evet |
-| Backend  | **Railway** | $5 kredi/ay (~500 saat 512MB instance) | Evet, ~%50 marj |
+| Backend  | **Render** | 750 saat/ay, 512 MB RAM (uyku modlu) | Evet, kalıcı ücretsiz |
 | Postgres | **Neon**  | 500 MB + 191 saat compute/ay | Evet (ilk 1000 kullanıcıya) |
 | Redis    | **Upstash** | 10.000 komut/gün | Evet, opsiyonel — yoksa memory fallback |
 | Sentry   | **Sentry** | 5K event/ay | Evet, opsiyonel |
@@ -58,7 +58,7 @@ git push -u origin main
    ```
    postgresql://user:pass@ep-xxx.eu-central-1.aws.neon.tech/neondb?sslmode=require
    ```
-4. Bu string'i bir yere not et. Hem migration için hem Railway env için lazım.
+4. Bu string'i bir yere not et. Hem migration için hem Render env için lazım.
 
 ### Şemayı oluştur (lokalden)
 
@@ -84,19 +84,26 @@ npx prisma db seed   # opsiyonel: planları + superadmin tohumla
    rediss://default:pass@xxx.upstash.io:6379
    ```
 
-> Bunu **atlayabilirsin** — Redis yoksa backend memory fallback kullanır. Tek instance Railway'de çalışıyorsa fark etmez.
+> Bunu **atlayabilirsin** — Redis yoksa backend memory fallback kullanır. Tek instance Render'da çalışıyorsa fark etmez.
 
 ---
 
-## 3. Railway Backend (15 dk)
+## 3. Render Backend (15 dk)
 
-1. <https://railway.app> → GitHub ile giriş
-2. **New Project** → **Deploy from GitHub repo** → `trendanaliz` repo seç
+> **Not:** Render kalıcı ücretsiz tier sunar (kredi kartı gerekmez). Tek dezavantaj: 15 dk
+> inaktivitede uyku moduna geçer, ilk istek ~30 sn sürer.
+
+1. <https://render.com> → GitHub ile giriş
+2. **New → Web Service** → GitHub repondan `trendanaliz` seç
 3. **Configure**:
+   - **Name**: `trendanaliz-api`
+   - **Region**: `Frankfurt (EU Central)`
    - **Root directory**: `backend`
+   - **Runtime**: `Node`
    - **Build command**: `npm install && npx prisma generate && npm run build`
    - **Start command**: `node dist/app.js`
-4. **Variables** sekmesinde şu env'leri ekle (her birini ayrı satır):
+   - **Instance Type**: **Free**
+4. **Environment** sekmesinde şu env'leri ekle:
 
    ```env
    NODE_ENV=production
@@ -121,7 +128,7 @@ npx prisma db seed   # opsiyonel: planları + superadmin tohumla
    # Sentry (opsiyonel)
    SENTRY_DSN=
 
-   # Trendyol webhook (opsiyonel — Trendyol panelinden gireceğin secret ile aynı)
+   # Trendyol webhook (opsiyonel)
    TRENDYOL_WEBHOOK_SECRET=
 
    # Trendyol live push (mağaza yoksa 0 bırak)
@@ -134,9 +141,9 @@ npx prisma db seed   # opsiyonel: planları + superadmin tohumla
    1..3 | ForEach-Object { -join ((48..57) + (97..122) | Get-Random -Count 64 | % {[char]$_}) }
    ```
 
-6. **Generate Domain** → Railway sana `trendanaliz-api-production.up.railway.app` benzeri bir URL verir.
-7. **Deploy** başlar. Logs sekmesinden takip et.
-8. Bittiğinde: `https://<railway-url>/health/full` → `{"status":"ok"}` görmeli.
+6. **Create Web Service** → Deploy başlar (~3-5 dk). Logs sekmesinden takip et.
+7. Render sana `https://trendanaliz-api.onrender.com` benzeri bir URL verir.
+8. Bittiğinde: `https://<render-url>/health/full` → `{"status":"ok"}` görmeli.
 
 ---
 
@@ -151,12 +158,12 @@ npx prisma db seed   # opsiyonel: planları + superadmin tohumla
    - **Output Directory**: (varsayılan) `.next`
 4. **Environment Variables**:
    ```env
-   NEXT_PUBLIC_API_URL=https://<railway-url>.up.railway.app/api
+   NEXT_PUBLIC_API_URL=https://<render-url>.onrender.com/api
    ```
    > `/api` ekli olmalı. `api` olmadan tüm istekler 404 olur.
 5. **Deploy** → ~2 dk
 6. Vercel sana `trendanaliz-xyz.vercel.app` URL'i verir.
-7. **Bu URL'i kopyala** → Railway'e geri dön → `CORS_ORIGINS` değerini bu URL'le güncelle → **Redeploy**.
+7. **Bu URL'i kopyala** → Render Dashboard'a geri dön → Environment → `CORS_ORIGINS` değerini bu URL'le güncelle → **Manual Deploy** tetikle.
 
 ---
 
@@ -184,17 +191,17 @@ npx prisma studio
 ## 6. Trendyol Webhook (opsiyonel, mağazan yoksa atla)
 
 Trendyol Satıcı Paneli → API Yönetimi → Webhook:
-- **URL**: `https://<railway-url>/api/webhooks/trendyol`
-- **Authorization**: `Bearer <TRENDYOL_WEBHOOK_SECRET>` (Railway'deki değer)
+- **URL**: `https://<render-url>.onrender.com/api/webhooks/trendyol`
+- **Authorization**: `Bearer <TRENDYOL_WEBHOOK_SECRET>` (Render'daki değer)
 
 ---
 
 ## 7. CI/CD (otomatik)
 
 Artık `git push` her seferinde:
-- **Railway**: backend otomatik build + deploy
+- **Render**: backend otomatik build + deploy
 - **Vercel**: frontend otomatik build + deploy
-- **GitHub Actions** (`.github/workflows/ci.yml`): typecheck + test çalışır, fail varsa deploy etmemek için Vercel/Railway hookları kapat.
+- **GitHub Actions** (`.github/workflows/ci.yml`): typecheck + test çalışır, fail varsa deploy etmemek için Vercel/Render hookları kapat.
 
 ---
 
@@ -202,8 +209,8 @@ Artık `git push` her seferinde:
 
 Domain aldığında (örn. `trendanaliz.com.tr`, Namecheap'ten yıllık ~$10):
 - **Vercel**: Settings → Domains → `trendanaliz.com.tr` ekle → Vercel'in verdiği A record'ları DNS'e gir.
-- **Railway**: Settings → Networking → Custom Domain → `api.trendanaliz.com.tr` → CNAME ekle.
-- Railway env'de `CORS_ORIGINS=https://trendanaliz.com.tr` yap.
+- **Render**: Settings → Custom Domains → `api.trendanaliz.com.tr` → CNAME ekle.
+- Render env'de `CORS_ORIGINS=https://trendanaliz.com.tr` yap.
 - Vercel env'de `NEXT_PUBLIC_API_URL=https://api.trendanaliz.com.tr/api` yap.
 
 ---
@@ -215,28 +222,28 @@ Domain aldığında (örn. `trendanaliz.com.tr`, Namecheap'ten yıllık ~$10):
 | Aşama | Aylık tahmini |
 |---|---|
 | 0-100 kullanıcı | **$0** |
-| 100-500 kullanıcı | $5 (Railway upgrade) |
-| 500-2000 kullanıcı | $20 (Railway $10 + Neon $19'a geç) |
+| 100-500 kullanıcı | $7 (Render Starter) |
+| 500-2000 kullanıcı | $26 (Render $7 + Neon $19'a geç) |
 | 2000+ | Dedicated VPS'e taşı |
 
 ---
 
 ## 10. Sık Karşılaşılan Hatalar
 
-**"Cannot connect to database" Railway logs'ta**
+**"Cannot connect to database" Render logs'ta**
 - DATABASE_URL'in sonunda `?sslmode=require` var mı? Neon zorunlu.
 
 **Frontend "Network Error" / CORS hatası**
-- Railway env `CORS_ORIGINS` Vercel URL'inle birebir eşleşmeli (sonunda slash YOK, https YES).
+- Render env `CORS_ORIGINS` Vercel URL'inle birebir eşleşmeli (sonunda slash YOK, https YES).
 
 **Vercel build "Module not found"**
 - `frontend/package.json` içinde `axios`, `lucide-react`, vb. devDependencies'te değil dependencies'te olmalı.
 
 **Trendyol API timeout**
-- Railway free tier'de outbound trafik dakikada limitlidir. Pro'ya geçince çözülür.
+- Render free tier'de cold start süresi uzun olabilir. Starter'a geçince çözülür.
 
 **SSE bağlantısı kopuyor**
-- Vercel/Cloudflare SSE'yi 30 sn sonra kesebilir. `NEXT_PUBLIC_API_URL` Railway URL'i (direct, proxy'siz) olmalı.
+- Vercel/Cloudflare SSE'yi 30 sn sonra kesebilir. `NEXT_PUBLIC_API_URL` Render URL'i (direct, proxy'siz) olmalı.
 
 ---
 
