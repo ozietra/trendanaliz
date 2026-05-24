@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Docker imajını küçültmek için standalone çıktı
-  output: 'standalone',
   // Trendyol ürün görselleri için izinli alan adları
   images: {
     remotePatterns: [
