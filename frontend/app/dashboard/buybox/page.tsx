@@ -44,6 +44,7 @@ interface ListResponse {
   page: number;
   size: number;
   totalPages: number;
+  stats?: { winning: number; losing: number; noRivals: number; unknown: number };
 }
 
 const STATE_LABEL: Record<BuyboxRow['state'], string> = {
@@ -120,17 +121,13 @@ export default function BuyboxPage() {
   };
 
   const stats = useMemo(() => {
-    if (!data) return { winning: 0, losing: 0, noRivals: 0, total: 0 };
-    return data.items.reduce(
-      (acc, row) => {
-        acc.total++;
-        if (row.state === 'winning') acc.winning++;
-        else if (row.state === 'losing') acc.losing++;
-        else if (row.state === 'no-rivals') acc.noRivals++;
-        return acc;
-      },
-      { winning: 0, losing: 0, noRivals: 0, total: 0 }
-    );
+    if (!data?.stats) return { winning: 0, losing: 0, noRivals: 0, total: 0 };
+    return {
+      winning: data.stats.winning,
+      losing: data.stats.losing,
+      noRivals: data.stats.noRivals,
+      total: data.total,
+    };
   }, [data]);
 
   return (

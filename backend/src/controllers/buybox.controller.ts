@@ -104,6 +104,27 @@ export const listBuyboxStatus = async (req: AuthenticatedRequest, res: Response)
       };
     });
 
+    // Sayfa filtresi öncesinde toplam istatistikleri hesapla (tüm ürünler üzerinden)
+    const allProductIds = await prisma.product.findMany({
+      where: { storeId: { in: storeIds } },
+      select: {
+        id: true,
+        buyboxSnapshots: {
+          orderBy: { checkedAt: 'desc' as const },
+          take: 1,
+          select: { buyboxOrder: true, hasMultipleSeller: true },
+        },
+      },
+    });
+    const aggregateStats = { winning: 0, losing: 0, noRivals: 0, unknown: 0 };
+    for (const p of allProductIds) {
+      const s = p.buyboxSnapshots[0];
+      if (!s) { aggregateStats.unknown++; continue; }
+      if (!s.hasMultipleSeller) aggregateStats.noRivals++;
+      else if (s.buyboxOrder === 1) aggregateStats.winning++;
+      else aggregateStats.losing++;
+    }
+
     if (state && ['winning', 'losing', 'no-rivals'].includes(state)) {
       items = items.filter((it) => it.state === state);
     }
@@ -116,6 +137,7 @@ export const listBuyboxStatus = async (req: AuthenticatedRequest, res: Response)
         page,
         size,
         totalPages: Math.ceil(total / size),
+        stats: aggregateStats,
       },
     });
   } catch (err) {

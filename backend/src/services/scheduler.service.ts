@@ -64,7 +64,7 @@ export class SchedulerService {
           user: {
             include: {
               subscriptions: {
-                where: { status: 'ACTIVE' },
+                where: { status: { in: ['ACTIVE', 'TRIAL'] } },
                 include: { plan: true }
               }
             }
@@ -147,7 +147,7 @@ export class SchedulerService {
           user: {
             include: {
               subscriptions: {
-                where: { status: 'ACTIVE' },
+                where: { status: { in: ['ACTIVE', 'TRIAL'] } },
                 include: { plan: true },
               },
             },
