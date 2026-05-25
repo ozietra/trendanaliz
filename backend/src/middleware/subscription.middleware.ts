@@ -70,7 +70,7 @@ export const requireActiveSubscription = async (
     const sub = await prisma.subscription.findFirst({
       where: {
         userId: req.user.id,
-        status: SubscriptionStatus.ACTIVE,
+        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL] },
         endDate: { gt: new Date() },
       },
       include: {

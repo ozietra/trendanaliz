@@ -515,3 +515,52 @@ export const me = async (req: AuthenticatedRequest, res: Response) => {
     });
   }
 };
+
+/**
+ * DELETE /api/auth/me
+ * Kullanıcının hesap silme talebi göndermesi.
+ * Hesap hemen silinmez — admin panelden onaylanması gerekir.
+ */
+export const requestDeletion = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Oturum açık değil.' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, email: true, role: true, deletionRequestedAt: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+    }
+
+    if (user.role === Role.SUPERADMIN) {
+      return res.status(403).json({ success: false, message: 'SUPERADMIN hesabı silinemez.' });
+    }
+
+    if (user.deletionRequestedAt) {
+      return res.json({
+        success: true,
+        message: 'Hesap silme talebiniz zaten alınmıştır. Yönetim onayı bekleniyor.',
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { deletionRequestedAt: new Date() },
+    });
+
+    logger.info(`Hesap silme talebi: ${user.email} (${user.id})`);
+
+    return res.json({
+      success: true,
+      message: 'Hesap silme talebiniz alındı. Yönetim onayladıktan sonra hesabınız ve tüm verileriniz kalıcı olarak silinecektir.',
+    });
+  } catch (error: unknown) {
+    const err = error as Error;
+    logger.error(`requestDeletion hatası: ${err.message}`);
+    return res.status(500).json({ success: false, message: 'Talep oluşturulurken bir hata oluştu.' });
+  }
+};

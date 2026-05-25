@@ -106,8 +106,9 @@ export const listUsers = async (req: AuthenticatedRequest, res: Response) => {
         isActive: true,
         emailVerified: true,
         createdAt: true,
+        deletionRequestedAt: true,
         subscriptions: {
-          where: { status: SubscriptionStatus.ACTIVE },
+          where: { status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL] } },
           select: { status: true, endDate: true, plan: { select: { name: true } } },
           take: 1,
         },
@@ -504,7 +505,7 @@ export const grantTrial = async (req: AuthenticatedRequest, res: Response) => {
     data: {
       userId,
       planId: plan.id,
-      status: SubscriptionStatus.TRIAL,
+      status: SubscriptionStatus.ACTIVE,
       startDate: now,
       endDate,
       autoRenew: false,
@@ -640,5 +641,81 @@ export const listLogs = async (req: AuthenticatedRequest, res: Response) => {
     success: true,
     data: items,
     pagination: { page: p, pageSize: ps, total, pages: Math.ceil(total / ps) },
+  });
+};
+
+/**
+ * DELETE /api/admin/users/:id
+ * Kullanıcıyı ve tüm ilişkili verilerini kalıcı olarak siler.
+ * SUPERADMIN hesapları silinemez.
+ */
+export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
+  const adminId = req.user!.id;
+  const userId = req.params.id;
+
+  if (adminId === userId) {
+    return res.status(400).json({ success: false, message: 'Kendi hesabınızı silemezsiniz.' });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, role: true },
+  });
+
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+  }
+
+  if (user.role === Role.SUPERADMIN) {
+    return res.status(403).json({ success: false, message: 'SUPERADMIN hesabı silinemez.' });
+  }
+
+  // Cascade: tüm subscriptions, stores, products, orders, payments, notifications silinir
+  await prisma.user.delete({ where: { id: userId } });
+
+  await logAction(adminId, 'USER_DELETE', userId, {
+    email: user.email,
+    name: user.name,
+  });
+
+  logger.info(`Kullanıcı silindi: ${user.email} (id: ${userId}) — admin: ${adminId}`);
+
+  return res.json({
+    success: true,
+    message: `${user.email} hesabı ve tüm verileri kalıcı olarak silindi.`,
+  });
+};
+
+/**
+ * POST /api/admin/users/:id/reject-deletion
+ * Kullanıcının hesap silme talebini reddeder (deletionRequestedAt → null).
+ */
+export const rejectDeletion = async (req: AuthenticatedRequest, res: Response) => {
+  const adminId = req.user!.id;
+  const userId = req.params.id;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, deletionRequestedAt: true },
+  });
+
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+  }
+
+  if (!user.deletionRequestedAt) {
+    return res.status(400).json({ success: false, message: 'Bu kullanıcının silme talebi yok.' });
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { deletionRequestedAt: null },
+  });
+
+  await logAction(adminId, 'DELETION_REJECTED', userId, { email: user.email });
+
+  return res.json({
+    success: true,
+    message: `${user.email} için silme talebi reddedildi.`,
   });
 };

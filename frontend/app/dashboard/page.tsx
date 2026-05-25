@@ -342,6 +342,25 @@ export default function DashboardPage() {
     }
   };
 
+  // Delete rule
+  const handleDeleteRule = async (ruleId: string) => {
+    if (!confirm('Bu stratejiyi ve ilişkili tüm kuralları silmek istiyor musunuz?')) return;
+    try {
+      const res = await api.delete(`/rules/${ruleId}`);
+      if (res.data.success) {
+        const [rulesRes, prodRes] = await Promise.all([
+          api.get('/rules'),
+          api.get('/products')
+        ]);
+        if (rulesRes.data.success) setRules(rulesRes.data.data);
+        if (prodRes.data.success) setProducts(prodRes.data.data);
+        await fetchLogsOnly();
+      }
+    } catch (err) {
+      console.error('Kural silme hatası:', err);
+    }
+  };
+
   // Filter products by search query and buybox status
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
@@ -648,6 +667,12 @@ export default function DashboardPage() {
 
             {/* Rules Cards List */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
+              {rules.length === 0 && (
+                <div className="col-span-full bg-[#0b1424] border border-white/[0.04] rounded-2xl p-6 text-center">
+                  <div className="text-slate-400 text-xs font-semibold mb-1">Henüz fiyatlandırma kuralı tanımlanmadı</div>
+                  <div className="text-slate-500 text-[10px]">Mağazanızda otomatik fiyat değişikliği yapılmayacaktır. Yeni kural eklemek için yukarıdaki butonu kullanabilirsiniz.</div>
+                </div>
+              )}
               {rules.map((rule) => (
                 <div 
                   key={rule.id} 
@@ -687,7 +712,7 @@ export default function DashboardPage() {
                     <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                       {rule.activeCount} Ürüne Tanımlı
                     </span>
-                    <button className="text-[9px] font-bold text-slate-500 hover:text-red-400 hover:bg-red-500/5 px-2 py-1 rounded transition-colors select-none">
+                    <button onClick={() => handleDeleteRule(rule.id)} className="text-[9px] font-bold text-slate-500 hover:text-red-400 hover:bg-red-500/5 px-2 py-1 rounded transition-colors select-none">
                       Sil
                     </button>
                   </div>

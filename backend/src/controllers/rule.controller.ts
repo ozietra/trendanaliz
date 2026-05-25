@@ -6,8 +6,29 @@ import { RuleType } from '@prisma/client';
 import { addStoreLog } from '../services/repricer.service';
 
 /**
+ * Kural tipi etiketleri
+ */
+const RULE_LABELS: Record<string, string> = {
+  MATCH_LOWEST: 'En Düşük Fiyat Eşitleme',
+  BEAT_BY_AMOUNT: 'BuyBox Koruması',
+  FIXED_MARGIN: 'Düşük Stok Fiyat Yükseltme',
+};
+const RULE_TYPE_SLUG: Record<string, string> = {
+  MATCH_LOWEST: 'min-match',
+  BEAT_BY_AMOUNT: 'buybox-defense',
+  FIXED_MARGIN: 'stock-boost',
+};
+const SLUG_TO_RULE_TYPE: Record<string, RuleType> = {
+  'min-match': RuleType.MATCH_LOWEST,
+  'buybox-defense': RuleType.BEAT_BY_AMOUNT,
+  'stock-boost': RuleType.FIXED_MARGIN,
+};
+
+/**
  * GET /api/rules
- * Kullanıcının tanımladığı akıllı fiyatlandırma stratejilerini listeler
+ * Kullanıcının **gerçek** PriceRule kayıtlarını gruplandırılmış şekilde listeler.
+ * Hardcoded varsayılan kural listesi KALDIRILDI — sadece veritabanındaki
+ * kayıtlar döner. Hiç kayıt yoksa boş liste döner.
  */
 export const getRules = async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id;
@@ -17,53 +38,68 @@ export const getRules = async (req: AuthenticatedRequest, res: Response) => {
   }
 
   try {
-    const store = await prisma.trendyolStore.findFirst({
-      where: { userId }
-    });
+    const store = await prisma.trendyolStore.findFirst({ where: { userId } });
 
     if (!store) {
       return res.json({ success: true, data: [] });
     }
 
-    const products = await prisma.product.findMany({
-      where: { storeId: store.id },
-      include: { priceRules: true }
+    // Gerçek PriceRule kayıtlarını çek
+    const priceRules = await prisma.priceRule.findMany({
+      where: { product: { storeId: store.id } },
+      include: { product: { select: { title: true } } },
     });
 
-    // Veritabanındaki tüm kural kayıtlarını çekelim ve arayüze uygun formatta gruplayalım
-    const rulesMap: Record<string, { id: string, name: string, type: string, limit: number, step: number, minMargin: number, activeCount: number, isActive: boolean }> = {
-      'min-match': { id: 'min-match', name: 'En Düşük Fiyat Eşitleme', type: 'min-match', limit: 799, step: 1.00, minMargin: 10, activeCount: 0, isActive: true },
-      'buybox-defense': { id: 'buybox-defense', name: 'BuyBox Koruması', type: 'buybox-defense', limit: 899, step: 0.50, minMargin: 15, activeCount: 0, isActive: true },
-      'stock-boost': { id: 'stock-boost', name: 'Düşük Stok Fiyat Yükseltme', type: 'stock-boost', limit: 1250, step: 8.00, minMargin: 20, activeCount: 0, isActive: false }
-    };
+    if (priceRules.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
 
-    // Aktif sayımları yap
-    for (const p of products) {
-      for (const rule of p.priceRules) {
-        if (rule.isActive) {
-          if (rule.ruleType === RuleType.MATCH_LOWEST) {
-            rulesMap['min-match'].activeCount += 1;
-            rulesMap['min-match'].isActive = true;
-          } else if (rule.ruleType === RuleType.BEAT_BY_AMOUNT) {
-            rulesMap['buybox-defense'].activeCount += 1;
-            rulesMap['buybox-defense'].isActive = true;
-          } else if (rule.ruleType === RuleType.FIXED_MARGIN) {
-            rulesMap['stock-boost'].activeCount += 1;
-            rulesMap['stock-boost'].isActive = true;
-          }
-        }
+    // Kural tipine göre grupla
+    const groups: Record<
+      string,
+      {
+        id: string;
+        name: string;
+        type: string;
+        step: number;
+        minMargin: number;
+        activeCount: number;
+        totalCount: number;
+        isActive: boolean;
+      }
+    > = {};
+
+    for (const rule of priceRules) {
+      const slug = RULE_TYPE_SLUG[rule.ruleType] || rule.ruleType;
+      if (!groups[slug]) {
+        groups[slug] = {
+          id: slug,
+          name: RULE_LABELS[rule.ruleType] || rule.ruleType,
+          type: slug,
+          step: Number(rule.targetValue),
+          minMargin: 0,
+          activeCount: 0,
+          totalCount: 0,
+          isActive: false,
+        };
+      }
+      groups[slug].totalCount += 1;
+      if (rule.isActive) {
+        groups[slug].activeCount += 1;
+        groups[slug].isActive = true;
       }
     }
 
-    const rulesList = Object.values(rulesMap);
     return res.json({
       success: true,
-      data: rulesList
+      data: Object.values(groups),
     });
   } catch (error: unknown) {
     const err = error as Error;
     logger.error(`Get rules hatası: ${err.message}`);
-    return res.status(500).json({ success: false, message: 'Fiyatlandırma kuralları yüklenirken sunucu hatası oluştu.' });
+    return res
+      .status(500)
+      .json({ success: false, message: 'Fiyatlandırma kuralları yüklenirken sunucu hatası oluştu.' });
   }
 };
 
@@ -84,50 +120,42 @@ export const addRule = async (req: AuthenticatedRequest, res: Response) => {
   }
 
   try {
-    const store = await prisma.trendyolStore.findFirst({
-      where: { userId }
-    });
+    const store = await prisma.trendyolStore.findFirst({ where: { userId } });
 
     if (!store) {
       return res.status(404).json({ success: false, message: 'Önce entegrasyonu tamamlamalısınız.' });
     }
 
-    // Yeni oluşturulan kuralı simüle etmek için mağazaya ait ilk ürüne bu kuralı ekleyelim veya güncelleyelim
+    const mappedType = SLUG_TO_RULE_TYPE[type] || RuleType.MATCH_LOWEST;
+
+    // İlk ürüne kural ekle
     const firstProduct = await prisma.product.findFirst({
       where: { storeId: store.id },
-      include: { priceRules: true }
+      include: { priceRules: true },
     });
 
-    let mappedType: RuleType = RuleType.MATCH_LOWEST;
-    if (type === 'buybox-defense') {
-      mappedType = RuleType.BEAT_BY_AMOUNT;
-    } else if (type === 'stock-boost') {
-      mappedType = RuleType.FIXED_MARGIN;
-    }
-
     if (firstProduct) {
-      const existingRule = firstProduct.priceRules[0];
+      const existingRule = firstProduct.priceRules.find((r) => r.ruleType === mappedType);
       if (existingRule) {
         await prisma.priceRule.update({
           where: { id: existingRule.id },
           data: {
-            ruleType: mappedType,
-            minPrice: limit || existingRule.minPrice,
             targetValue: step || existingRule.targetValue,
+            minPrice: limit || existingRule.minPrice,
             isActive: true,
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         });
       } else {
         await prisma.priceRule.create({
           data: {
             productId: firstProduct.id,
             ruleType: mappedType,
-            targetValue: step || 1.00,
-            minPrice: limit || 100.00,
-            maxPrice: limit ? limit * 2 : 2000.00,
-            isActive: true
-          }
+            targetValue: step || 1.0,
+            minPrice: limit || 100.0,
+            maxPrice: limit ? limit * 2 : 2000.0,
+            isActive: true,
+          },
         });
       }
     }
@@ -136,7 +164,7 @@ export const addRule = async (req: AuthenticatedRequest, res: Response) => {
 
     return res.json({
       success: true,
-      message: `"${name}" stratejisi başarıyla oluşturuldu.`
+      message: `"${name}" stratejisi başarıyla oluşturuldu.`,
     });
   } catch (error: unknown) {
     const err = error as Error;
@@ -151,62 +179,102 @@ export const addRule = async (req: AuthenticatedRequest, res: Response) => {
  */
 export const toggleRule = async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id;
-  const ruleId = req.params.id; // type bilgisi 'min-match', 'buybox-defense' vb.
+  const ruleId = req.params.id; // slug: 'min-match', 'buybox-defense', 'stock-boost'
 
   if (!userId) {
     return res.status(401).json({ success: false, message: 'Yetkisiz işlem.' });
   }
 
   try {
-    const store = await prisma.trendyolStore.findFirst({
-      where: { userId }
-    });
+    const store = await prisma.trendyolStore.findFirst({ where: { userId } });
 
     if (!store) {
       return res.status(404).json({ success: false, message: 'Mağaza bulunamadı.' });
     }
 
-    // Bu kural tipine uyan tüm ürünlerdeki kural durumunu tersine çevir (Toggle)
-    let mappedType: RuleType = RuleType.MATCH_LOWEST;
-    if (ruleId === 'buybox-defense') {
-      mappedType = RuleType.BEAT_BY_AMOUNT;
-    } else if (ruleId === 'stock-boost') {
-      mappedType = RuleType.FIXED_MARGIN;
+    const mappedType = SLUG_TO_RULE_TYPE[ruleId];
+    if (!mappedType) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kural tipi.' });
     }
 
-    const products = await prisma.product.findMany({
-      where: { storeId: store.id },
-      include: {
-        priceRules: {
-          where: { ruleType: mappedType }
-        }
-      }
+    // Bu kural tipine ait tüm kuralları bul
+    const rules = await prisma.priceRule.findMany({
+      where: { ruleType: mappedType, product: { storeId: store.id } },
     });
 
-    let nextState = true;
-    for (const p of products) {
-      for (const rule of p.priceRules) {
-        nextState = !rule.isActive;
-        await prisma.priceRule.update({
-          where: { id: rule.id },
-          data: {
-            isActive: nextState,
-            updatedAt: new Date()
-          }
-        });
-      }
+    if (rules.length === 0) {
+      return res.status(404).json({ success: false, message: 'Bu tipte tanımlı kural bulunamadı.' });
     }
 
-    const ruleName = ruleId === 'min-match' ? 'En Düşük Fiyat Eşitleme' : ruleId === 'buybox-defense' ? 'BuyBox Koruması' : 'Düşük Stok Fiyat Yükseltme';
-    addStoreLog(store.id, `KURAL DURUMU DEĞİŞTİ: "${ruleName}" stratejisi ${nextState ? 'AKTİF EDİLDİ' : 'PASİFLEŞTİRİLDİ'}.`);
+    // Tüm kuralların mevcut durumunun tersini uygula
+    const nextState = !rules[0].isActive;
+
+    await prisma.priceRule.updateMany({
+      where: { ruleType: mappedType, product: { storeId: store.id } },
+      data: { isActive: nextState, updatedAt: new Date() },
+    });
+
+    const ruleName = RULE_LABELS[mappedType] || ruleId;
+    addStoreLog(
+      store.id,
+      `KURAL DURUMU DEĞİŞTİ: "${ruleName}" stratejisi ${nextState ? 'AKTİF EDİLDİ' : 'PASİFLEŞTİRİLDİ'}.`
+    );
 
     return res.json({
       success: true,
-      message: `Strateji başarıyla ${nextState ? 'etkinleştirildi' : 'devre dışı bırakıldı'}.`
+      message: `Strateji başarıyla ${nextState ? 'etkinleştirildi' : 'devre dışı bırakıldı'}.`,
     });
   } catch (error: unknown) {
     const err = error as Error;
     logger.error(`Toggle rule hatası: ${err.message}`);
-    return res.status(500).json({ success: false, message: 'Strateji durumu değiştirilirken sunucu hatası oluştu.' });
+    return res
+      .status(500)
+      .json({ success: false, message: 'Strateji durumu değiştirilirken sunucu hatası oluştu.' });
+  }
+};
+
+/**
+ * DELETE /api/rules/:id
+ * Bir kural tipine ait tüm kuralları kalıcı olarak siler.
+ */
+export const deleteRule = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user?.id;
+  const ruleId = req.params.id;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'Yetkisiz işlem.' });
+  }
+
+  try {
+    const store = await prisma.trendyolStore.findFirst({ where: { userId } });
+
+    if (!store) {
+      return res.status(404).json({ success: false, message: 'Mağaza bulunamadı.' });
+    }
+
+    const mappedType = SLUG_TO_RULE_TYPE[ruleId];
+    if (!mappedType) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kural tipi.' });
+    }
+
+    const deleted = await prisma.priceRule.deleteMany({
+      where: { ruleType: mappedType, product: { storeId: store.id } },
+    });
+
+    if (deleted.count === 0) {
+      return res.status(404).json({ success: false, message: 'Silinecek kural bulunamadı.' });
+    }
+
+    const ruleName = RULE_LABELS[mappedType] || ruleId;
+    addStoreLog(store.id, `KURAL SİLİNDİ: "${ruleName}" stratejisi silindi (${deleted.count} kayıt).`);
+
+    return res.json({
+      success: true,
+      message: `"${ruleName}" stratejisi silindi (${deleted.count} ürünün kuralı kaldırıldı).`,
+    });
+  } catch (error: unknown) {
+    const err = error as Error;
+    logger.error(`Delete rule hatası: ${err.message}`);
+    return res.status(500).json({ success: false, message: 'Strateji silinirken sunucu hatası oluştu.' });
   }
 };

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import AdminSidebar from '../../../components/AdminSidebar';
 import { api } from '../../../lib/api';
-import { Loader2, Search, ShieldCheck, ShieldOff, CheckCircle2, XCircle, Gift, Ban, X } from 'lucide-react';
+import { Loader2, Search, ShieldCheck, ShieldOff, CheckCircle2, XCircle, Gift, Ban, X, Trash2, AlertTriangle } from 'lucide-react';
 
 interface Plan {
   id: string;
@@ -20,6 +20,7 @@ interface User {
   isActive: boolean;
   emailVerified: boolean;
   createdAt: string;
+  deletionRequestedAt: string | null;
   subscriptions: Array<{ status: string; endDate: string; plan: { name: string } }>;
 }
 
@@ -140,6 +141,28 @@ export default function AdminUsersPage() {
     if (!confirm(`${u.email} kullanıcısının rolünü ${newRole} yapmak istiyor musunuz?`)) return;
     try {
       await api.patch(`/admin/users/${u.id}`, { role: newRole });
+      await load();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'İşlem başarısız.');
+    }
+  };
+
+  const deleteUser = async (u: User) => {
+    if (!confirm(`⚠️ DİKKAT: ${u.email} hesabını ve TÜM verilerini kalıcı olarak silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz!`)) return;
+    try {
+      const res = await api.delete(`/admin/users/${u.id}`);
+      setSuccess(res.data?.message || 'Kullanıcı silindi.');
+      await load();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Silme başarısız.');
+    }
+  };
+
+  const rejectDeletion = async (u: User) => {
+    if (!confirm(`${u.email} kullanıcısının silme talebini reddetmek istiyor musunuz?`)) return;
+    try {
+      const res = await api.post(`/admin/users/${u.id}/reject-deletion`);
+      setSuccess(res.data?.message || 'Silme talebi reddedildi.');
       await load();
     } catch (err: any) {
       setError(err.response?.data?.message || 'İşlem başarısız.');
@@ -286,6 +309,35 @@ export default function AdminUsersPage() {
                               </>
                             )}
                           </button>
+                          {/* Silme Talebi Varsa: Onayla / Reddet */}
+                          {u.deletionRequestedAt && (
+                            <>
+                              <button
+                                onClick={() => deleteUser(u)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 animate-pulse"
+                                title="Silme talebini onayla (kalıcı sil)"
+                              >
+                                <Trash2 className="w-3 h-3" /> Sil (Onayla)
+                              </button>
+                              <button
+                                onClick={() => rejectDeletion(u)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-500/10 text-slate-300 border border-slate-500/20 hover:bg-slate-500/20"
+                                title="Silme talebini reddet"
+                              >
+                                <XCircle className="w-3 h-3" /> Reddet
+                              </button>
+                            </>
+                          )}
+                          {/* Silme talebi yoksa: Sil butonu */}
+                          {!u.deletionRequestedAt && u.role !== 'SUPERADMIN' && (
+                            <button
+                              onClick={() => deleteUser(u)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20"
+                              title="Kullanıcıyı kalıcı sil"
+                            >
+                              <Trash2 className="w-3 h-3" /> Sil
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

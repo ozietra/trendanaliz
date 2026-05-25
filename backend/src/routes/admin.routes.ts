@@ -15,6 +15,8 @@ import {
   listLogs,
   grantTrial,
   cancelUserSubscription,
+  deleteUser,
+  rejectDeletion,
 } from '../controllers/admin.controller';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -30,6 +32,8 @@ router.get('/users', listUsers as any);
 router.patch('/users/:id', updateUser as any);
 router.post('/users/:id/grant-trial', grantTrial as any);
 router.post('/users/:id/cancel-subscription', cancelUserSubscription as any);
+router.delete('/users/:id', deleteUser as any);
+router.post('/users/:id/reject-deletion', rejectDeletion as any);
 
 router.get('/plans', listPlans as any);
 router.post('/plans', createPlan as any);

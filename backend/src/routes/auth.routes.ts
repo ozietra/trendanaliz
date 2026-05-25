@@ -8,6 +8,7 @@ import {
   forgotPassword,
   resetPassword,
   me,
+  requestDeletion,
 } from '../controllers/auth.controller';
 import { authenticateToken } from '../middleware/auth.middleware';
 
@@ -25,6 +26,7 @@ router.post('/reset-password/:token', resetPassword);
 
 // Korumalı (Protected) Rotalar
 router.get('/me', authenticateToken as any, me);
+router.delete('/me', authenticateToken as any, requestDeletion);
 router.post('/logout', authenticateToken as any, logout);
 
 export default router;

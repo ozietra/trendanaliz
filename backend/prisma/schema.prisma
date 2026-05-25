@@ -89,6 +89,10 @@ model User {
   // null ise notification.service.ts içindeki DEFAULT_PREFS kullanılır.
   notificationPrefs Json?
 
+  // Hesap silme talebi: kullanıcı talep gönderdiğinde set edilir,
+  // admin onaylarsa user silinir, reddederse null'a döner.
+  deletionRequestedAt DateTime?
+
   // Relations
   subscriptions  Subscription[]
   trendyolStores TrendyolStore[]

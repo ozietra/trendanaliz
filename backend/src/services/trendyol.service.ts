@@ -261,7 +261,7 @@ export const testCredentials = async (
  */
 export const fetchProducts = async (
   creds: ClientCredentials,
-  options: { page?: number; size?: number; approved?: boolean; barcode?: string } = {}
+  options: { page?: number; size?: number; approved?: boolean; onSale?: boolean; barcode?: string } = {}
 ): Promise<{
   totalElements: number;
   totalPages: number;
@@ -274,6 +274,7 @@ export const fetchProducts = async (
     page: options.page ?? 0,
     size: options.size ?? 50,
     approved: options.approved ?? true,
+    onSale: options.onSale ?? true,
     ...(options.barcode ? { barcode: options.barcode } : {}),
   };
   const data = await requestWithRetry<any>(client, {
