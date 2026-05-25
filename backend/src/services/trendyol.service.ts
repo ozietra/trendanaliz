@@ -564,9 +564,12 @@ export const markLinesUnsupplied = async (
 //
 // POST /integration/product/sellers/{sellerId}/products/buybox-information
 //
-// İstek gövdesi: { "barcodes": ["...","...", ...] }
-// Resmi limit dokümante edilmemiş; pratikte 1000'lik chunk güvenli.
-// Yanıt: { "buyboxInfo": [ ... ] } — eksik barkodlar geri dönmeyebilir.
+// Resmi dokümantasyon:
+//   - Header: storeFrontCode zorunlu (genellikle "TR")
+//   - İstek gövdesi: { "barcodes": ["...", ...] }
+//   - İstek başına en fazla 10 barkod gönderilebilir
+//   - Dakikada en fazla 1000 istek
+//   - Yanıt: { "buyboxInfo": [ ... ] }
 
 export interface TrendyolBuyboxInfo {
   barcode: string;
@@ -583,8 +586,8 @@ interface BuyboxResponse {
 
 /**
  * Verilen barkod listesi için Trendyol Buybox bilgilerini çeker.
- * Tek istekte gönderilmesi güvenli olduğu varsayılan eşik: 200 barkod.
- * Daha fazlası için `fetchAllBuyboxInfo` kullanın.
+ * Trendyol resmi limiti: tek istekte EN FAZLA 10 barkod.
+ * storeFrontCode header'ı zorunludur.
  */
 export const fetchBuyboxInfo = async (
   creds: ClientCredentials,
@@ -593,16 +596,24 @@ export const fetchBuyboxInfo = async (
   if (barcodes.length === 0) return [];
   const client = createClient(creds);
   const path = `/integration/product/sellers/${creds.supplierId}/products/buybox-information`;
+
+  // storeFrontCode header'ını ekle (Trendyol zorunlu kılıyor)
+  const storeFrontCode = process.env.TRENDYOL_STOREFRONT_CODE || 'TR';
+  client.defaults.headers.common['storeFrontCode'] = storeFrontCode;
+
   const data = await requestWithRetry<BuyboxResponse>(client, {
     method: 'post',
     url: path,
     data: { barcodes },
   });
+
+  logger.info(`Buybox API yanıt: ${data.buyboxInfo?.length ?? 0} sonuç (gönderilen: ${barcodes.length})`);
   return data.buyboxInfo || [];
 };
 
 /**
  * Çok sayıda barkod için chunk'lara bölerek tüm buybox bilgilerini çeker.
+ * Trendyol resmi limiti: istek başına 10 barkod, dakikada 1000 istek.
  * 429/5xx'lerde requestWithRetry otomatik yedek+jitter ile bekler.
  */
 export const fetchAllBuyboxInfo = async (
@@ -610,18 +621,27 @@ export const fetchAllBuyboxInfo = async (
   barcodes: string[],
   options: { chunkSize?: number; sleepMsBetweenChunks?: number } = {}
 ): Promise<TrendyolBuyboxInfo[]> => {
-  const chunkSize = options.chunkSize ?? 200;
-  const sleepMs = options.sleepMsBetweenChunks ?? 200;
+  // Trendyol limiti: istek başına 10 barkod
+  const chunkSize = options.chunkSize ?? 10;
+  // Rate limit: 1000 req/min → ~60ms arası güvenli, 100ms ile margin bırakıyoruz
+  const sleepMs = options.sleepMsBetweenChunks ?? 100;
 
   const result: TrendyolBuyboxInfo[] = [];
   const unique = Array.from(new Set(barcodes.filter(Boolean)));
+
+  logger.info(`Buybox tarama başlıyor: ${unique.length} barkod, ${Math.ceil(unique.length / chunkSize)} chunk`);
+
+  let successChunks = 0;
+  let failedChunks = 0;
 
   for (let i = 0; i < unique.length; i += chunkSize) {
     const chunk = unique.slice(i, i + chunkSize);
     try {
       const part = await fetchBuyboxInfo(creds, chunk);
       result.push(...part);
+      successChunks++;
     } catch (err) {
+      failedChunks++;
       logger.warn(
         `Buybox chunk başarısız (offset=${i}, size=${chunk.length}): ${(err as Error).message}`
       );
@@ -630,5 +650,9 @@ export const fetchAllBuyboxInfo = async (
       await sleep(sleepMs);
     }
   }
+
+  logger.info(
+    `Buybox tarama tamamlandı: ${result.length} sonuç, ${successChunks} başarılı/${failedChunks} başarısız chunk`
+  );
   return result;
 };

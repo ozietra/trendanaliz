@@ -49,9 +49,44 @@ export const listBuyboxStatus = async (req: AuthenticatedRequest, res: Response)
       ];
     }
 
-    const [products, total] = await prisma.$transaction([
+    // Önce tüm ürünlerin son snapshot'larını çek (aggregate stats için)
+    const allProducts = await prisma.product.findMany({
+      where: { storeId: { in: storeIds } },
+      select: {
+        id: true,
+        buyboxSnapshots: {
+          orderBy: { checkedAt: 'desc' as const },
+          take: 1,
+          select: { buyboxOrder: true, hasMultipleSeller: true },
+        },
+      },
+    });
+
+    const aggregateStats = { winning: 0, losing: 0, noRivals: 0, unknown: 0, totalProducts: allProducts.length };
+    // BuyBox eligible = snapshot'ı olan VE birden fazla satıcısı olan ürünler
+    const eligibleProductIds: string[] = [];
+    for (const p of allProducts) {
+      const s = p.buyboxSnapshots[0];
+      if (!s) { aggregateStats.unknown++; continue; }
+      if (!s.hasMultipleSeller) { aggregateStats.noRivals++; continue; }
+      // hasMultipleSeller = true → BuyBox rekabeti var
+      if (s.buyboxOrder === 1) aggregateStats.winning++;
+      else aggregateStats.losing++;
+      eligibleProductIds.push(p.id);
+    }
+
+    // Sadece BuyBox rekabeti olan ürünleri sayfalı çek
+    const eligibleWhere: any = { id: { in: eligibleProductIds } };
+    if (search) {
+      eligibleWhere.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { barcode: { contains: search } },
+      ];
+    }
+
+    const [products, eligibleTotal] = await prisma.$transaction([
       prisma.product.findMany({
-        where,
+        where: eligibleWhere,
         orderBy: { updatedAt: 'desc' },
         skip: page * size,
         take: size,
@@ -77,7 +112,7 @@ export const listBuyboxStatus = async (req: AuthenticatedRequest, res: Response)
           },
         },
       }),
-      prisma.product.count({ where }),
+      prisma.product.count({ where: eligibleWhere }),
     ]);
 
     const storeMap = new Map(stores.map((s) => [s.id, s.storeName]));
@@ -104,27 +139,6 @@ export const listBuyboxStatus = async (req: AuthenticatedRequest, res: Response)
       };
     });
 
-    // Sayfa filtresi öncesinde toplam istatistikleri hesapla (tüm ürünler üzerinden)
-    const allProductIds = await prisma.product.findMany({
-      where: { storeId: { in: storeIds } },
-      select: {
-        id: true,
-        buyboxSnapshots: {
-          orderBy: { checkedAt: 'desc' as const },
-          take: 1,
-          select: { buyboxOrder: true, hasMultipleSeller: true },
-        },
-      },
-    });
-    const aggregateStats = { winning: 0, losing: 0, noRivals: 0, unknown: 0 };
-    for (const p of allProductIds) {
-      const s = p.buyboxSnapshots[0];
-      if (!s) { aggregateStats.unknown++; continue; }
-      if (!s.hasMultipleSeller) aggregateStats.noRivals++;
-      else if (s.buyboxOrder === 1) aggregateStats.winning++;
-      else aggregateStats.losing++;
-    }
-
     if (state && ['winning', 'losing', 'no-rivals'].includes(state)) {
       items = items.filter((it) => it.state === state);
     }
@@ -133,10 +147,10 @@ export const listBuyboxStatus = async (req: AuthenticatedRequest, res: Response)
       success: true,
       data: {
         items,
-        total,
+        total: eligibleTotal,
         page,
         size,
-        totalPages: Math.ceil(total / size),
+        totalPages: Math.ceil(eligibleTotal / size),
         stats: aggregateStats,
       },
     });

@@ -44,7 +44,7 @@ interface ListResponse {
   page: number;
   size: number;
   totalPages: number;
-  stats?: { winning: number; losing: number; noRivals: number; unknown: number };
+  stats?: { winning: number; losing: number; noRivals: number; unknown: number; totalProducts: number };
 }
 
 const STATE_LABEL: Record<BuyboxRow['state'], string> = {
@@ -179,9 +179,9 @@ export default function BuyboxPage() {
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
             icon={<Package className="w-4 h-4" />}
-            label="Toplam Ürün"
-            value={String(data?.total ?? 0)}
-            sub="bu sayfada"
+            label="BuyBox Rekabeti"
+            value={String((data?.stats?.winning ?? 0) + (data?.stats?.losing ?? 0))}
+            sub={`${data?.stats?.totalProducts ?? 0} üründen`}
           />
           <StatCard
             icon={<Trophy className="w-4 h-4" />}
@@ -402,10 +402,12 @@ function EmptyState() {
       <div className="w-12 h-12 rounded-full bg-white/[0.04] flex items-center justify-center mx-auto mb-3">
         <Award className="w-5 h-5 text-slate-500" />
       </div>
-      <h3 className="text-sm font-bold text-white">Henüz BuyBox verisi yok</h3>
-      <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-        Mağazanızı eklediyseniz birkaç dakika içinde otomatik tarama başlar.
-        Hemen başlatmak için yukarıdaki "Şimdi Tara" düğmesini kullanabilirsiniz.
+      <h3 className="text-sm font-bold text-white">BuyBox rekabeti bulunamadı</h3>
+      <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+        Bu ekranda yalnızca birden fazla satıcısı olan ürünler listelenir.
+        Arka planda Trendyol BuyBox API&apos;si ile ürünleriniz taranır ve
+        rakipli ürünler otomatik olarak burada görünür.
+        İlk tarama için yukarıdaki &quot;Şimdi Tara&quot; butonuna basabilirsiniz.
       </p>
     </div>
   );
