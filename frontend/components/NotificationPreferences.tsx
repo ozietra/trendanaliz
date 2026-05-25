@@ -10,9 +10,10 @@ import {
   MessageSquare,
   AlertCircle,
   CheckCircle2,
+  Send,
 } from 'lucide-react';
 
-type Channel = 'IN_APP' | 'EMAIL' | 'SMS';
+type Channel = 'IN_APP' | 'EMAIL' | 'SMS' | 'TELEGRAM';
 
 interface PrefsResponse {
   events: string[];
@@ -74,6 +75,7 @@ const CHANNEL_META: Record<
   IN_APP: { label: 'Uygulama', icon: Bell },
   EMAIL: { label: 'E-posta', icon: Mail },
   SMS: { label: 'SMS', icon: MessageSquare },
+  TELEGRAM: { label: 'Telegram', icon: Send },
 };
 
 export default function NotificationPreferences() {
@@ -82,6 +84,8 @@ export default function NotificationPreferences() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [telegramConnected, setTelegramConnected] = useState(false);
+  const [telegramLink, setTelegramLink] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -94,6 +98,12 @@ export default function NotificationPreferences() {
         setLoading(false);
       }
     })();
+    // Telegram bağlantı durumunu kontrol et
+    api.get('/auth/me').then((res) => {
+      const user = res.data?.data;
+      if (user?.telegramChatId) setTelegramConnected(true);
+      if (user?.id) setTelegramLink(`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'TrendAnalizBot'}?start=${user.id}`);
+    }).catch(() => {});
   }, []);
 
   const toggle = (event: string, channel: Channel) => {
@@ -176,15 +186,51 @@ export default function NotificationPreferences() {
         seçebilir (IN_APP açık/kapalı). EMAIL/SMS toggle'ları gizlendi
         çünkü arka uç DEFAULT_PREFS de IN_APP-only.
       */}
+      {/* Telegram Bağlantı Durumu */}
+      <div className="m-3 p-3 rounded-lg bg-[#070c16] border border-white/[0.04]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Send className="w-4 h-4 text-blue-400" />
+            <div>
+              <div className="text-xs font-bold text-white">Telegram Bildirimleri</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                {telegramConnected ? (
+                  <span className="text-emerald-400">✅ Telegram hesabınız bağlı</span>
+                ) : (
+                  'Telegram hesabınızı bağlayarak anlık bildirim alın'
+                )}
+              </div>
+            </div>
+          </div>
+          {!telegramConnected && telegramLink && (
+            <a
+              href={telegramLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold transition-all flex items-center gap-1"
+            >
+              <Send className="w-3 h-3" />
+              Telegram Bağla
+            </a>
+          )}
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-[#070c16] text-slate-400">
             <tr>
               <th className="text-left px-4 py-2 font-bold">Olay</th>
-              <th className="px-2 py-2 font-bold w-32 text-center">
+              <th className="px-2 py-2 font-bold w-24 text-center">
                 <span className="inline-flex items-center gap-1">
                   <Bell className="w-3 h-3" />
-                  Uygulama içi
+                  Uygulama
+                </span>
+              </th>
+              <th className="px-2 py-2 font-bold w-24 text-center">
+                <span className="inline-flex items-center gap-1">
+                  <Send className="w-3 h-3" />
+                  Telegram
                 </span>
               </th>
             </tr>
@@ -196,7 +242,8 @@ export default function NotificationPreferences() {
                 description: '',
               };
               const selected = data.prefs[event] || [];
-              const checked = selected.includes('IN_APP');
+              const inAppChecked = selected.includes('IN_APP');
+              const tgChecked = selected.includes('TELEGRAM');
               return (
                 <tr key={event} className="hover:bg-white/[0.02]">
                   <td className="px-4 py-3">
@@ -208,33 +255,10 @@ export default function NotificationPreferences() {
                     )}
                   </td>
                   <td className="px-2 py-3 text-center">
-                    <label className="inline-flex items-center justify-center cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={checked}
-                        onChange={() => toggle(event, 'IN_APP')}
-                      />
-                      <span
-                        className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                          checked
-                            ? 'bg-brand-orange border-brand-orange'
-                            : 'bg-transparent border-white/15 hover:border-white/30'
-                        }`}
-                      >
-                        {checked && (
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                            className="w-3 h-3 text-white"
-                          >
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </span>
-                    </label>
+                    <ChannelToggle checked={inAppChecked} onChange={() => toggle(event, 'IN_APP')} />
+                  </td>
+                  <td className="px-2 py-3 text-center">
+                    <ChannelToggle checked={tgChecked} onChange={() => toggle(event, 'TELEGRAM')} disabled={!telegramConnected} />
                   </td>
                 </tr>
               );
@@ -244,9 +268,36 @@ export default function NotificationPreferences() {
       </div>
 
       <footer className="px-4 py-3 border-t border-white/[0.04] text-[11px] text-slate-500">
-        Şu an yalnızca uygulama içi bildirimler aktiftir. E-posta/SMS bildirimleri
-        ileride aktif edilecektir.
+        Telegram bildirimleri için hesabınızı yukarıdaki butonla bağlayın.
+        E-posta/SMS bildirimleri ileride aktif edilecektir.
       </footer>
     </div>
+  );
+}
+
+function ChannelToggle({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+  return (
+    <label className={`inline-flex items-center justify-center select-none ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}>
+      <input
+        type="checkbox"
+        className="sr-only peer"
+        checked={checked}
+        onChange={disabled ? undefined : onChange}
+        disabled={disabled}
+      />
+      <span
+        className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+          checked
+            ? 'bg-brand-orange border-brand-orange'
+            : 'bg-transparent border-white/15 hover:border-white/30'
+        }`}
+      >
+        {checked && (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-3 h-3 text-white">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+      </span>
+    </label>
   );
 }
