@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { logger } from './logger';
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const API_BASE = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const getApiBase = () => {
+  const token = process.env.TELEGRAM_BOT_TOKEN || '';
+  return `https://api.telegram.org/bot${token}`;
+};
 
 /**
  * Telegram'a mesaj gönderir.
@@ -13,19 +15,19 @@ export const sendTelegramMessage = async (
   text: string,
   options?: { parse_mode?: 'HTML' | 'MarkdownV2' }
 ): Promise<boolean> => {
-  if (!BOT_TOKEN) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
     logger.warn(`Telegram mesajı atlandı (TELEGRAM_BOT_TOKEN ayarlanmamış): chatId=${chatId}`);
     return false;
   }
   try {
-    await axios.post(`${API_BASE}/sendMessage`, {
+    await axios.post(`${getApiBase()}/sendMessage`, {
       chat_id: chatId,
       text,
       parse_mode: options?.parse_mode || 'HTML',
     });
     return true;
-  } catch (err) {
-    logger.warn(`Telegram mesaj gönderilemedi (chatId=${chatId}): ${(err as Error).message}`);
+  } catch (err: any) {
+    logger.warn(`Telegram mesaj gönderilemedi (chatId=${chatId}): ${err.response?.data?.description || err.message}`);
     return false;
   }
 };
@@ -34,11 +36,12 @@ export const sendTelegramMessage = async (
  * Bot bilgisini döner (bağlantı testi).
  */
 export const getTelegramBotInfo = async () => {
-  if (!BOT_TOKEN) return null;
+  if (!process.env.TELEGRAM_BOT_TOKEN) return null;
   try {
-    const res = await axios.get(`${API_BASE}/getMe`);
+    const res = await axios.get(`${getApiBase()}/getMe`);
     return res.data?.result || null;
-  } catch {
+  } catch (err: any) {
+    logger.error(`Telegram getMe hatası: ${err.response?.data?.description || err.message}`);
     return null;
   }
 };
@@ -48,14 +51,10 @@ export const getTelegramBotInfo = async () => {
  * offset: son işlenen update_id + 1
  */
 export const getUpdates = async (offset?: number): Promise<any[]> => {
-  if (!BOT_TOKEN) return [];
-  try {
-    const res = await axios.get(`${API_BASE}/getUpdates`, {
-      params: { offset, timeout: 30 },
-      timeout: 35000,
-    });
-    return res.data?.result || [];
-  } catch {
-    return [];
-  }
+  if (!process.env.TELEGRAM_BOT_TOKEN) return [];
+  const res = await axios.get(`${getApiBase()}/getUpdates`, {
+    params: { offset, timeout: 30 },
+    timeout: 35000,
+  });
+  return res.data?.result || [];
 };
