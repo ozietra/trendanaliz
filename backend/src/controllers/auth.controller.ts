@@ -6,7 +6,7 @@ import { prisma } from '../config/database';
 import { logger } from '../utils/logger';
 import { sendMail } from '../utils/mailer';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
-import { Role } from '@prisma/client';
+import { Role, SubscriptionStatus, PaymentMethod } from '@prisma/client';
 import { env } from '../config/env';
 import {
   getLoginAttempt,
@@ -92,6 +92,29 @@ export const register = async (req: AuthenticatedRequest, res: Response) => {
 
     logger.info(`Yeni kullanıcı kaydoldu: ${email} (${user.id})`);
 
+    // 🎁 Otomatik 3 günlük PRO plan deneme aboneliği oluştur
+    try {
+      const proPlan = await prisma.plan.findFirst({ where: { slug: 'pro' } });
+      if (proPlan) {
+        const now = new Date();
+        const endDate = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // 3 gün
+        await prisma.subscription.create({
+          data: {
+            userId: user.id,
+            planId: proPlan.id,
+            status: SubscriptionStatus.TRIAL,
+            startDate: now,
+            endDate,
+            autoRenew: false,
+            paymentMethod: PaymentMethod.MANUAL,
+          },
+        });
+        logger.info(`3 günlük PRO deneme oluşturuldu: userId=${user.id}`);
+      }
+    } catch (trialErr) {
+      logger.warn(`Otomatik deneme oluşturulamadı: ${(trialErr as Error).message}`);
+    }
+
     // E-posta Doğrulama Token'ı (JWT - 1 Günlük)
     const verificationToken = jwt.sign({ email }, env.jwtSecret, { expiresIn: '1d' });
     const verificationUrl = `${env.frontendUrl}/verify-email?token=${verificationToken}`;
@@ -112,13 +135,14 @@ export const register = async (req: AuthenticatedRequest, res: Response) => {
           <p>${verificationUrl}</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
           <p style="font-size: 12px; color: #666;">Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</p>
+          <p style="font-size: 12px; color: #FF6B00; font-weight: bold;">  🎁 3 günlük ücretsiz PRO denemeniz başladı!</p>
         </div>
       `,
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Kayıt başarıyla tamamlandı. Lütfen e-posta adresinize gönderilen doğrulama bağlantısını kontrol edin.',
+      message: 'Kayıt başarıyla tamamlandı. 3 günlük ücretsiz PRO denemeniz başladı! Lütfen e-posta adresinize gönderilen doğrulama bağlantısını kontrol edin.',
       data: {
         id: user.id,
         email: user.email,

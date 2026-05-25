@@ -240,7 +240,7 @@ export default function LandingPage() {
               href="/kayit" 
               className="bg-brand-orange hover:bg-brand-orange-hover text-white font-bold text-center text-sm px-8 py-4 rounded-xl shadow-lg shadow-brand-orange/20 hover:shadow-brand-orange/30 flex items-center justify-center gap-2 transform hover:-translate-y-0.5 transition-all duration-200 group"
             >
-              <span>Plan Seç ve Başla</span>
+              <span>3 Gün Ücretsiz Dene</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a 
@@ -254,15 +254,15 @@ export default function LandingPage() {
           <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs sm:text-sm text-slate-400 pt-4">
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-brand-orange shrink-0 animate-pulse" />
+              <span>3 Gün Ücretsiz PRO Deneme</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-brand-orange shrink-0 animate-pulse" />
               <span>Kredi Kartı Gerekmez</span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-brand-orange shrink-0 animate-pulse" />
-              <span>1 Dakikada Kurulum</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-brand-orange shrink-0 animate-pulse" />
-              <span>14 Gün Cayma Hakkı</span>
+              <span>Telegram Bildirim Botu</span>
             </div>
           </div>
         </div>
@@ -632,7 +632,7 @@ export default function LandingPage() {
                           href={`/kayit?plan=${plan.slug}`}
                           className={`w-full text-center block font-bold text-sm py-3.5 rounded-xl transition-all ${isPro ? 'bg-brand-orange hover:bg-brand-orange-hover text-white shadow-lg shadow-brand-orange/10 hover:shadow-brand-orange/20 transform hover:-translate-y-0.5' : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'}`}
                         >
-                          Planı Seç
+                          {isPro ? 'Ücretsiz Dene — 3 Gün' : 'Planı Seç'}
                         </Link>
                       )}
                     </div>
@@ -646,7 +646,7 @@ export default function LandingPage() {
             <span>Aylık veya yıllık paketler arasından seçim yapın, dilediğiniz an iptal edin.</span>
             <span className="hidden sm:inline text-white/10">|</span>
             <Link href="/kayit" className="text-brand-orange hover:underline font-bold">
-              Hemen Kaydol ve Başla
+              3 Gün Ücretsiz PRO Dene
             </Link>
           </div>
 

@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 import { RepricerService } from './repricer.service';
 import { syncStoreOrders } from './order.service';
 import { syncBuyboxForStore } from './buybox.service';
+import { startTelegramBot } from './telegram-bot.service';
 
 // Sipariş senkronizasyon periyodu (varsayılan 5 dk; ENV ile override edilebilir)
 const ORDER_SYNC_INTERVAL_MS = Number(process.env.ORDER_SYNC_INTERVAL_MS || 5 * 60 * 1000);
@@ -40,6 +41,11 @@ export class SchedulerService {
         this.startOrderSyncForStore(store.id);
         await this.startBuyboxSyncForStore(store.id);
       }
+
+      // Telegram bot long-polling başlat (7/24 çalışır)
+      startTelegramBot().catch((err) =>
+        logger.warn(`Telegram bot başlatma hatası: ${(err as Error).message}`)
+      );
     } catch (error: unknown) {
       const err = error as Error;
       logger.error(`Scheduler init hatası: ${err.message}`);

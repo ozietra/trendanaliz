@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 import { NotificationType } from '@prisma/client';
 import { sendMail } from '../utils/mailer';
 import { sendSms } from '../utils/sms';
+import { sendTelegramMessage } from '../utils/telegram';
 
 /**
  * Bildirim Servisi (channel-aware).
@@ -25,7 +26,7 @@ import { sendSms } from '../utils/sms';
  * 'STOCK_LOW', 'SUBSCRIPTION_EXPIRING', 'PAYMENT_FAILED' vs.
  */
 
-export type NotificationChannel = 'IN_APP' | 'EMAIL' | 'SMS';
+export type NotificationChannel = 'IN_APP' | 'EMAIL' | 'SMS' | 'TELEGRAM';
 
 /**
  * Yeni kullanıcılar için varsayılan bildirim tercihleri.
@@ -113,7 +114,7 @@ const resolveChannels = (
     ) {
       const userChans = (prefs as Record<string, unknown>)[event] as string[];
       const valid = userChans.filter((c): c is NotificationChannel =>
-        ['IN_APP', 'EMAIL', 'SMS'].includes(c)
+        ['IN_APP', 'EMAIL', 'SMS', 'TELEGRAM'].includes(c)
       );
       if (valid.length > 0) return valid;
     }
@@ -146,7 +147,7 @@ export const createNotification = async (input: CreateNotificationInput) => {
   // Kullanıcıyı tercihler ve iletişim için çek
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
-    select: { id: true, email: true, phone: true, notificationPrefs: true },
+    select: { id: true, email: true, phone: true, notificationPrefs: true, telegramChatId: true },
   });
   if (!user) {
     logger.warn(`createNotification: kullanıcı bulunamadı (id=${input.userId})`);
@@ -210,6 +211,14 @@ export const createNotification = async (input: CreateNotificationInput) => {
     );
   }
 
+  // 4) TELEGRAM — fire-and-forget
+  if (channels.includes('TELEGRAM') && user.telegramChatId) {
+    const telegramText = `🔔 <b>${input.title}</b>\n\n${input.message}`;
+    void sendTelegramMessage(user.telegramChatId, telegramText).catch((err) =>
+      logger.warn(`Telegram bildirim hatası: ${err.message}`)
+    );
+  }
+
   return notif;
 };
 
@@ -265,7 +274,7 @@ export const updateUserNotificationPrefs = async (
     const valid = (chans || [])
       .filter((c) => typeof c === 'string')
       .filter((c): c is NotificationChannel =>
-        ['IN_APP', 'EMAIL', 'SMS'].includes(c)
+        ['IN_APP', 'EMAIL', 'SMS', 'TELEGRAM'].includes(c)
       );
     next[event] = valid;
   }

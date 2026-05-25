@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -20,8 +20,12 @@ import {
   FolderOpen,
   DollarSign,
   Percent,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuthStore } from '../store/auth.store';
+import { api } from '../lib/api';
 
 const NAV = [
   { href: '/dashboard', label: 'Genel Durum', icon: BarChart3 },
@@ -40,10 +44,28 @@ const NAV = [
   { href: '/dashboard/abonelik', label: 'Abonelik', icon: CreditCard },
 ];
 
+interface SubInfo {
+  status: string;
+  planName: string;
+  hoursLeft: number;
+}
+
 export default function DashboardSidebar() {
   const pathname = usePathname();
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'SUPERADMIN';
+  const [sub, setSub] = useState<SubInfo | null>(null);
+
+  useEffect(() => {
+    api.get('/subscriptions/me').then((res) => {
+      const d = res.data?.data;
+      if (d && d.status) {
+        const end = new Date(d.endDate).getTime();
+        const hoursLeft = Math.max(0, Math.ceil((end - Date.now()) / (1000 * 60 * 60)));
+        setSub({ status: d.status, planName: d.plan?.name || d.planName || 'Plan', hoursLeft });
+      }
+    }).catch(() => {});
+  }, []);
 
   return (
     <aside className="w-12 md:w-52 border-r border-white/[0.04] bg-[#09101d] p-2 md:p-3 flex flex-col shrink-0 select-none overflow-y-auto">
@@ -74,6 +96,36 @@ export default function DashboardSidebar() {
           );
         })}
       </nav>
+
+      {/* Abonelik Durumu Badge */}
+      <div className="mt-3 pt-3 border-t border-white/[0.04] hidden md:block">
+        {sub ? (
+          sub.status === 'TRIAL' ? (
+            <Link href="/dashboard/abonelik" className="block px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-all">
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-[10px] font-bold text-amber-400">Deneme</span>
+              </div>
+              <div className="text-[9px] text-amber-300/70 mt-0.5">{sub.hoursLeft} saat kaldı</div>
+            </Link>
+          ) : sub.status === 'ACTIVE' ? (
+            <div className="px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="text-[10px] font-bold text-emerald-400">{sub.planName}</span>
+              </div>
+            </div>
+          ) : null
+        ) : (
+          <Link href="/dashboard/abonelik" className="block px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/15 transition-all">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span className="text-[10px] font-bold text-red-400">Plan Yok</span>
+            </div>
+            <div className="text-[9px] text-red-300/70 mt-0.5">Yükselt →</div>
+          </Link>
+        )}
+      </div>
 
       {isSuperAdmin && (
         <div className="mt-auto pt-3 border-t border-white/[0.04]">

@@ -89,9 +89,11 @@ model User {
   // null ise notification.service.ts içindeki DEFAULT_PREFS kullanılır.
   notificationPrefs Json?
 
-  // Hesap silme talebi: kullanıcı talep gönderdiğinde set edilir,
-  // admin onaylarsa user silinir, reddederse null'a döner.
+  // Hesap silme talebi
   deletionRequestedAt DateTime?
+
+  // Telegram bot entegrasyonu: kullanıcının chat ID'si
+  telegramChatId String?
 
   // Relations
   subscriptions  Subscription[]
