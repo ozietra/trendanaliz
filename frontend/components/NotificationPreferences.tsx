@@ -102,7 +102,7 @@ export default function NotificationPreferences() {
     api.get('/auth/me').then((res) => {
       const user = res.data?.data;
       if (user?.telegramChatId) setTelegramConnected(true);
-      if (user?.id) setTelegramLink(`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'TrendAnalizBot'}?start=${user.id}`);
+      if (user?.id) setTelegramLink(`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'trendanalizbildirim_bot'}?start=${user.id}`);
     }).catch(() => {});
   }, []);
 
