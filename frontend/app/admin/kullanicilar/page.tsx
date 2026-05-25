@@ -22,6 +22,7 @@ interface User {
   createdAt: string;
   deletionRequestedAt: string | null;
   subscriptions: Array<{ status: string; endDate: string; plan: { name: string } }>;
+  stores: Array<{ id: string; storeName: string; isActive: boolean; productCount: number; buyboxEligible: number }>;
 }
 
 export default function AdminUsersPage() {
@@ -223,6 +224,7 @@ export default function AdminUsersPage() {
                     <th className="text-left p-3 font-semibold">Kullanıcı</th>
                     <th className="text-left p-3 font-semibold hidden md:table-cell">Rol</th>
                     <th className="text-left p-3 font-semibold hidden lg:table-cell">Abonelik</th>
+                    <th className="text-left p-3 font-semibold hidden lg:table-cell">Ürünler</th>
                     <th className="text-center p-3 font-semibold">Durum</th>
                     <th className="text-left p-3 font-semibold hidden md:table-cell">Kayıt</th>
                     <th className="text-right p-3 font-semibold">Aksiyon</th>
@@ -253,6 +255,23 @@ export default function AdminUsersPage() {
                             <span className="font-bold text-white">{u.subscriptions[0].plan.name}</span>
                             <span className="text-slate-500 ml-1">({u.subscriptions[0].status})</span>
                           </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-500">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 hidden lg:table-cell">
+                        {u.stores && u.stores.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {u.stores.map((s) => (
+                              <div key={s.id} className="text-[10px]">
+                                <span className="text-white font-bold">{s.productCount}</span>
+                                <span className="text-slate-500"> ürün</span>
+                                {s.buyboxEligible > 0 && (
+                                  <span className="text-brand-orange ml-1 font-bold">({s.buyboxEligible} BB)</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-[10px] text-slate-500">—</span>
                         )}

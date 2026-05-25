@@ -141,7 +141,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Verilen kimlik bilgileri için axios instance oluşturur.
+ * storeFrontCode header'ı Trendyol tarafından zorunlu kılınır (Türkiye = "1").
  */
+const STOREFRONT_CODE = process.env.TRENDYOL_STOREFRONT_CODE || '1';
+
 const createClient = (creds: ClientCredentials): AxiosInstance => {
   const token = Buffer.from(`${creds.apiKey}:${creds.apiSecret}`).toString('base64');
   return axios.create({
@@ -152,6 +155,7 @@ const createClient = (creds: ClientCredentials): AxiosInstance => {
       'User-Agent': `${creds.supplierId} - ${UA_SUFFIX}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      'storeFrontCode': STOREFRONT_CODE,
     },
     // Trendyol kendi hata gövdelerini döner; axios'un kendi atışı yerine biz parse edelim
     validateStatus: () => true,
@@ -597,10 +601,6 @@ export const fetchBuyboxInfo = async (
   const client = createClient(creds);
   const path = `/integration/product/sellers/${creds.supplierId}/products/buybox-information`;
 
-  // storeFrontCode header'ını ekle (Trendyol zorunlu kılıyor)
-  const storeFrontCode = process.env.TRENDYOL_STOREFRONT_CODE || 'TR';
-  client.defaults.headers.common['storeFrontCode'] = storeFrontCode;
-
   const data = await requestWithRetry<BuyboxResponse>(client, {
     method: 'post',
     url: path,
@@ -621,9 +621,10 @@ export const fetchAllBuyboxInfo = async (
   barcodes: string[],
   options: { chunkSize?: number; sleepMsBetweenChunks?: number } = {}
 ): Promise<TrendyolBuyboxInfo[]> => {
-  // Trendyol limiti: istek başına 10 barkod
+  // Trendyol limiti: istek başına maks 10 barkod
   const chunkSize = options.chunkSize ?? 10;
-  // Rate limit: 1000 req/min → ~60ms arası güvenli, 100ms ile margin bırakıyoruz
+  // Rate limit: 1000 req/dakika = ~16.6 req/sn
+  // Güvenli aralık: 100ms (10 req/sn) ile margin bırakıyoruz
   const sleepMs = options.sleepMsBetweenChunks ?? 100;
 
   const result: TrendyolBuyboxInfo[] = [];

@@ -112,13 +112,56 @@ export const listUsers = async (req: AuthenticatedRequest, res: Response) => {
           select: { status: true, endDate: true, plan: { select: { name: true } } },
           take: 1,
         },
+        trendyolStores: {
+          select: {
+            id: true,
+            storeName: true,
+            isActive: true,
+            _count: { select: { products: true } },
+          },
+        },
       },
     }),
   ]);
 
+  // Her kullanıcı için buybox eligible (hasMultipleSeller) sayısını hesapla
+  const storeIds = items.flatMap((u) => u.trendyolStores.map((s: any) => s.id));
+  let buyboxMap: Record<string, number> = {};
+  if (storeIds.length > 0) {
+    const snapshots = await prisma.buyBoxSnapshot.groupBy({
+      by: ['productId'],
+      where: {
+        product: { storeId: { in: storeIds } },
+        hasMultipleSeller: true,
+      },
+      _max: { checkedAt: true },
+    });
+    // productId → storeId eşlemesi
+    const productStoreMap = await prisma.product.findMany({
+      where: { id: { in: snapshots.map((s) => s.productId) } },
+      select: { id: true, storeId: true },
+    });
+    const psMap = new Map(productStoreMap.map((p) => [p.id, p.storeId]));
+    for (const snap of snapshots) {
+      const sid = psMap.get(snap.productId);
+      if (sid) buyboxMap[sid] = (buyboxMap[sid] || 0) + 1;
+    }
+  }
+
+  const data = items.map((u) => ({
+    ...u,
+    stores: u.trendyolStores.map((s: any) => ({
+      id: s.id,
+      storeName: s.storeName,
+      isActive: s.isActive,
+      productCount: s._count.products,
+      buyboxEligible: buyboxMap[s.id] || 0,
+    })),
+  }));
+
   return res.json({
     success: true,
-    data: items,
+    data,
     pagination: { page: p, pageSize: ps, total, pages: Math.ceil(total / ps) },
   });
 };
