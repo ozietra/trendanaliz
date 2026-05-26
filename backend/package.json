@@ -4,7 +4,7 @@
   "description": "TrendAnaliz - Trendyol Satıcı Yönetim Platformu Backend",
   "main": "dist/app.js",
   "scripts": {
-    "build": "prisma generate && prisma migrate resolve --rolled-back 20260525202309_add_telegram_chat_id && prisma migrate deploy && tsc",
+    "build": "prisma generate && prisma migrate deploy && tsc",
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "prisma:generate": "prisma generate",

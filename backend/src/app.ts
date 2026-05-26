@@ -43,6 +43,7 @@ import healthRoutes from './routes/health.routes';
 import productGroupRoutes from './routes/product-group.routes';
 import bulkPricingRoutes from './routes/bulk-pricing.routes';
 import commissionRoutes from './routes/commission.routes';
+import profitRoutes from './routes/profit.routes';
 import { logger } from './utils/logger';
 import { SchedulerService } from './services/scheduler.service';
 import { startSubscriptionCron } from './services/subscription-cron.service';
@@ -136,6 +137,7 @@ app.use('/api/buybox', protectedGuard, buyboxRoutes);
 app.use('/api/product-groups', protectedGuard, productGroupRoutes);
 app.use('/api/bulk-pricing', protectedGuard, bulkPricingRoutes);
 app.use('/api/commissions', protectedGuard, commissionRoutes);
+app.use('/api/profit', protectedGuard, profitRoutes);
 
 // Sağlık Kontrolleri: /health, /health/db, /health/redis, /health/full
 app.use('/health', healthRoutes);

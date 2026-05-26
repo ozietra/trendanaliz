@@ -275,6 +275,8 @@ model Product {
   listPrice      Decimal          @db.Decimal(10, 2)
   vatRate        Decimal          @db.Decimal(5, 2)
   stockCount     Int              @default(0)
+  costPrice      Decimal?         @db.Decimal(10, 2)   // Alış fiyatı (kullanıcı girer)
+  shippingCost   Decimal?         @db.Decimal(10, 2)   // Kargo maliyeti (opsiyonel, ürün bazında)
   categoryId     String?
   categoryName   String?
   brandId        String?
