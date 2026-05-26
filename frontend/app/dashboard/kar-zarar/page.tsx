@@ -235,7 +235,7 @@ export default function KarZararPage() {
                   : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'
               }`}
             >
-              {t === 'input' ? '📦 Alış Fiyatı Girişi' : '📊 Kar-Zarar Raporu'}
+              {t === 'input' ? 'Alış Fiyatı Girişi' : 'Kar-Zarar Raporu'}
             </button>
           ))}
         </div>
